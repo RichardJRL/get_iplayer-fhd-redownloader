@@ -26,5 +26,24 @@ If they are available in `fhd`, it will either
 depending on user preference.
 
 # References:
+## File Formats
+### tv.cache
+Official file description copied from the first line of the `tv.cache` file.
+```
+#index|type|name|episode|seriesnum|episodenum|pid|channel|available|expires|duration|desc|web|thumbnail|timeadded
+```
+**NB:** If the cache does not index the full last-30 days of programmes when first refreshed with `get_iplayer --refresh`, try forcing a cache rebuild with `get_iplayer --cache-rebuild`.
+### download_history
+Reconstructed from a programme's accompanying `.xml` metadata file.
+```
+pid|name|episode|type|download_end_time|mode|filename|version|duration|desc|channel|categories|thumbnail|guidance|web|episodenum|seriesnum|
+```
+**NB:** `download_end_time` is the number of seconds since the Unix epoch that the download finished. Use the linux command `date --date="@[seconds_since_epoch]"` to get a human-readable time & date.
+e.g:
+```
+> date --date="@1678257312"
+Wed  8 Mar 06:35:12 GMT 2023
+```
+## Links
 - get_iplayer [GitHub](https://github.com/get-iplayer/get_iplayer)
 - get_iplayer [Wiki](https://github.com/get-iplayer/get_iplayer/wiki)
