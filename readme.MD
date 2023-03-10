@@ -38,12 +38,33 @@ Reconstructed from a programme's accompanying `.xml` metadata file.
 ```
 pid|name|episode|type|download_end_time|mode|filename|version|duration|desc|channel|categories|thumbnail|guidance|web|episodenum|seriesnum|
 ```
-**NB:** `download_end_time` is the number of seconds since the Unix epoch that the download finished. Use the linux command `date --date="@[seconds_since_epoch]"` to get a human-readable time & date.
+**NB:** `download_end_time` is the number of seconds since the Unix epoch that the download finished. Use the linux command `date --date="@[seconds_since_epoch]"` to get a human-readable 
+time & date.
 e.g:
 ```
 > date --date="@1678257312"
 Wed  8 Mar 06:35:12 GMT 2023
 ```
+**NB:** Some Gaelic language programmes use an additional `|` character to separate the dual-language English and Gaelic titles in the 2nd `name` field. This breaks the file-format and may be impossible to detect and correct for. On the other hand, it should be possible to anchor `tv` or `radio` to the 4th element of the file format. A dual-language title will shift this into the 5th element and this CAN be simply checked.
+Known problematic PIDs:
+- m001bnvz (English Gaelic language separator in `name`)
+  
+**NB:** Some programmes appear to include a newline character in their programme description. This also breaks the file format.
+Known problematic PIDs:
+- p026vhj2 (Hidden newline followed by 6 tabs in `desc`)
+- p026vhmr (Hidden newline followed by 6 tabs in `desc`)
+- p026vhrd (Hidden newline followed by 6 tabs in `desc`)
+- p026vg7w (Hidden newline followed by 6 tabs in `desc`)
+- m000trt5 (Gaelic English language separated by newline in `desc`)
+- p0dnvdrc (Multiple hidden newlines in `desc`)
+
+These are the only problematic PIDs in 11000 line `download_history` file that spans the period from September 2012 to March 2023.
+
+**Workaround:**
+- Check for more than 16 elements in the line... Adjust based on type `tv|radio` to account for dual-language `name`.
+- Check for `/^[a-zA-Z0-9]\|/` to match PID & field separator at the beginning of the line. This will catch the newline in description. Could combine with previous line saved as a previous array?
+- Skip completely blank lines.
+- Can further anchor elements in the regexp based on 10 digit `download_end_time` and a multi-digit `duration`.
 ## Links
 - get_iplayer [GitHub](https://github.com/get-iplayer/get_iplayer)
 - get_iplayer [Wiki](https://github.com/get-iplayer/get_iplayer/wiki)
