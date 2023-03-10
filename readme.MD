@@ -61,10 +61,15 @@ Known problematic PIDs:
 These are the only problematic PIDs in 11000 line `download_history` file that spans the period from September 2012 to March 2023.
 
 **Workaround:**
-- Check for more than 16 elements in the line... Adjust based on type `tv|radio` to account for dual-language `name`.
-- Check for `/^[a-zA-Z0-9]\|/` to match PID & field separator at the beginning of the line. This will catch the newline in description. Could combine with previous line saved as a previous array?
+*Thoughts:*
+- Check for NOT 17 elements in the line... Adjust based on type `tv|radio` to account for dual-language `name`.
+- Check for `/^[a-zA-Z0-9]{8}\|/` to match PID & field separator at the beginning of the line. This will catch the newline in description. Could combine with previous line saved as a previous array?
 - Skip completely blank lines.
 - Can further anchor elements in the regexp based on 10 digit `download_end_time` and a multi-digit `duration`.
+*Actual:*
+- Ignore zero-length lines
+- Only parse 17 element lines
+- Write non-conforming lines to a log file and forget about them in the program flow thereafter. Users will have to sort these out manually.
 ## Links
 - get_iplayer [GitHub](https://github.com/get-iplayer/get_iplayer)
 - get_iplayer [Wiki](https://github.com/get-iplayer/get_iplayer/wiki)
