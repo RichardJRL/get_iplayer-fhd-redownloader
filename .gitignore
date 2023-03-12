@@ -1,5 +1,5 @@
 .vscode/
 .vstags
 get_iplayer_test_files/
-get_iplayer-fhd-redownloader.log
-output.txt
+fhd-redownloader/
+output.*

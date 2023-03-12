@@ -3,6 +3,7 @@
 use strict;
 use warnings;
 use autodie;
+use File::Path;
 use Getopt::Long;
 use feature 'say';
 #use File::Spec;
@@ -22,15 +23,22 @@ my %alreadyDownloadedBothDef;
 # Variables to hold comand line arguments, and their defaults if not deliberately set
 # System defaults
 # my $claExecutablePath = '/usr/bin/get_iplayer';
-# my $claDataDir = '~/.get_iplayer';
-# my $claDownloadHistoryFilePath = $claDataDir . "/download_history";
-# my $claTVCacheFilePath = $claDataDir . "/tv.cache";
+# my $claDataDir = '~/.get_iplayer/';
+# my $claDownloadHistoryFilePath = $claDataDir . 'download_history';
+# my $claTVCacheFilePath = $claDataDir . 'tv.cache';
+# my $claRedownloaderDir = $claDataDir . '/fhd-redownloader/';
+# my $claLogFilePath = $claDataDir . $claRedownloaderDir . 'activity.log';
+# my $claIgnoreListFilePath = $claDataDir . $claRedownloaderDir . 'ignore.list';
+#
 # Testing overrides
 my $claExecutablePath = '/usr/bin/get_iplayer';
 my $claDataDir = './get_iplayer_test_files';
 my $claDownloadHistoryFilePath = $claDataDir . '/download_history';
 my $claTVCacheFilePath = $claDataDir . '/tv.cache';
-my $claLogFilePath = './get_iplayer-fhd-redownloader.log';
+my $claRedownloaderDir = $claDataDir . '/fhd-redownloader/';
+my $claLogFilePath = $claRedownloaderDir . 'activity.log';
+my $claIgnoreListFilePath = $claRedownloaderDir . 'ignore.list';
+
 
 ################################################################################
 # Subroutines
@@ -72,26 +80,106 @@ sub addDownloadedProgrammeData {
 # Main Program
 ################################################################################
 
-# Setup log file
-open($fhLogFile, '>:encoding(UTF-8)', $claLogFilePath);
-say $fhLogFile "# Program log: " . localtime;
-say $fhLogFile '';
-
 # Parse command line arguments
 GetOptions('get_iplayer-executable-path=s' => \$claExecutablePath);
-GetOptions('get_iplayer-data-dir=s' => \$claDataDir);
 GetOptions('download-history=s' => \$claDownloadHistoryFilePath);
 GetOptions('tv-cache=s' => \$claTVCacheFilePath);
 GetOptions('log-file=s' => \$claLogFilePath);
+GetOptions('ignore-list=s' => \$claIgnoreListFilePath);
+
+# Check the validity of the various required paths:
+my $pathErrorCounter = 0;
+my $tempLogFile = '';
+my $fhTempLogFile;
+open($fhTempLogFile, '>', \$tempLogFile);
+say $fhTempLogFile "# Program log: " . localtime;
+say $fhTempLogFile '';
 
 # Display summary of key variables, showing whether they are the defaults or have been modified by command line arguments
-say $fhLogFile "Command line arguments used:";
-say $fhLogFile "get_iplayer executable path is: $claExecutablePath";
-say $fhLogFile "get_iplayer data directory is: $claDataDir";
-say $fhLogFile "Download history file path is: $claDownloadHistoryFilePath";
-say $fhLogFile "TV cache file path is: $claTVCacheFilePath";
-say $fhLogFile "Log file path is: $claTVCacheFilePath";
-say $fhLogFile '';
+say $fhTempLogFile "Command line arguments & default values used:";
+say $fhTempLogFile "get_iplayer executable path: $claExecutablePath";
+say $fhTempLogFile "get_iplayer data directory: $claDataDir";
+say $fhTempLogFile "get_iplayer download history file path: $claDownloadHistoryFilePath";
+say $fhTempLogFile "get_iplayer TV cache file path: $claTVCacheFilePath";
+say $fhTempLogFile "fhd-redownloader directory: $claRedownloaderDir";
+say $fhTempLogFile "fhd-redownloader log file path: $claTVCacheFilePath";
+say $fhTempLogFile "fhd-redownloader ignore list file path: $claIgnoreListFilePath";
+say $fhTempLogFile '';
+
+# Perform file and directory path checks
+say $fhTempLogFile "Checking for the existance of essential files and directories...";
+# Check get_iplayer executable exists and is executable
+say $fhTempLogFile "Checking for the get_iplayer executable...";
+if(-e $claExecutablePath) {
+    say $fhTempLogFile "get_iplayer executable exists at $claExecutablePath";
+    if(!-x $claExecutablePath) {
+        say $fhTempLogFile "Error: The get_iplayer executable exits at the path $claExecutablePath but get_iplayer is not executable";
+        $pathErrorCounter++;
+    }
+    else {
+        say $fhTempLogFile "get_iplayer executable exists at $claExecutablePath and is executable"
+    }
+}
+else {
+    say $fhTempLogFile "Error: The get_iplayer executable does not exist at the path $claExecutablePath";
+    $pathErrorCounter++;
+}
+
+# Check the .get_iplayer directory exists, but first run get_iplayer to generate it if necessary (i.e. first run)
+say $fhTempLogFile "Checking for get_iplayer's data directory...";
+`$claExecutablePath -v`;
+if(!-d $claDataDir) {
+    say $fhTempLogFile "Error: The get_iplayer data directory does not exist at the path $claDataDir";
+    $pathErrorCounter++;
+}
+else {
+    say $fhTempLogFile "get_iplayer data directory exists at $claDataDir";
+}
+
+# Check the .get_iplayer/download_history file exists. Nothing to do if it can't be parsed.
+say $fhTempLogFile "Checking for the get_iplayer download history file...";
+if(!-f $claDownloadHistoryFilePath) {
+    say $fhTempLogFile "Error: The get_iplayer download history file $claDownloadHistoryFilePath does not exist";
+    $pathErrorCounter++;
+}
+else {
+    say $fhTempLogFile "get_iplayer download_history file exists at $claDownloadHistoryFilePath"
+}
+
+# Don't check if the tv.cache file exists here; it introduces a premature delay. It can be refreshed or rebuilt later.
+
+# Check the fhd-redownloader subdirectory exists; not an error, just create it if absent.
+say $fhTempLogFile "Checking for fhd-redownloader's data directory...";
+if(!-d $claRedownloaderDir) {
+    # Create if not, function returns a list if directories created. Test for 1 directory created.
+    if(scalar(File::Path::make_path($claRedownloaderDir)) == 1) {
+        say $fhTempLogFile "Created fhd-redownloader data directory $claRedownloaderDir";
+    }
+    else {
+        say $fhTempLogFile "Error: Unable to create fhd-redownloader data directory $claRedownloaderDir";
+        $pathErrorCounter++;
+    }
+}
+else {
+    say $fhTempLogFile "fhd-redownloader data directory exists at $claRedownloaderDir";
+}
+
+# Don't check for the fhd-redownloader activity.log or ignore.list files.
+# Their absence is not an error and they can be created later.
+
+# If errors encountered when checking for essential files and directories, print log to stdout and exit.
+if($pathErrorCounter != 0) {
+    say $fhTempLogFile "Exiting prematurely due to $pathErrorCounter errors encountered while checking for essential file and directory paths";
+    say $tempLogFile;
+    exit;
+}
+
+# Setup permanent log file
+# TODO: Change from overwrite to append mode >>
+open($fhLogFile, '>>:encoding(UTF-8)', $claLogFilePath);
+# Copy everything from the $tempLogFile variable to the actual log file
+say $fhLogFile $tempLogFile;
+close $fhTempLogFile;
 
 # Parse the download_history file and split its contents into two different arrays of
 # sd quality downloads (%alreadyDownloadedStanDef) and fhd quality downloads (%alreadyDownloadedHighDef)
@@ -117,7 +205,7 @@ while(my $programmeInfo = <$fhDownloadHistory>) {
     # Need '-1' to ensure empty fields in the file format are still translated into elements in the array
     my @splitProgrammeInfo = split(/\|/, $programmeInfo, -1);
     my $numElements = scalar(@splitProgrammeInfo) - 1;
-    if ($numElements != 17) {
+    if($numElements != 17) {
         say $fhLogFile "Line $lineCounter: Number of elements in the line is not 17 ($numElements): $programmeInfo";
         next;
     }
@@ -132,7 +220,7 @@ while(my $programmeInfo = <$fhDownloadHistory>) {
     # }
 
     # Match programmes already downloaded in fhd quality
-    if ($programmeInfo =~ /^[a-zA-Z0-9]{8}\|.*\|.*\|tv\|.*\|(dashfhd[0-9]|hlsfhd[0-9])/) {
+    if($programmeInfo =~ /^[a-zA-Z0-9]{8}\|.*\|.*\|tv\|.*\|(dashfhd[0-9]|hlsfhd[0-9])/) {
         addDownloadedProgrammeData(\%alreadyDownloadedHighDef, \@splitProgrammeInfo, $fhLogFile);
     }
     # Match programmes that do not exist in fhd quality
@@ -174,6 +262,14 @@ say $fhLogFile '';
 # }
 
 # # use `get_iplayer --info --pid=[PID] to check which available programmes are available in fhd quality`
+
+# Either offer an interactive prompt to chose whether to download or not (yes, no, ignore) and 
+# add the ignored programmes to an ignore file, so they are not presented upon a subsequent program run.
+# First, parse the ignore file if it exists...
+
+# Then offer the choices, add to pvr-queue
+
+# Offer to run get_iplayer --pvr now
 
 # close $fhTvCache;
 close $fhLogFile;
