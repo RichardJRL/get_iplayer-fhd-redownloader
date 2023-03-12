@@ -30,7 +30,7 @@ depending on user preference.
 ### tv.cache
 Official file description copied from the first line of the `tv.cache` file.
 ```
-#index|type|name|episode|seriesnum|episodenum|pid|channel|available|expires|duration|desc|web|thumbnail|timeadded
+#index|type|name|episode|seriesnum|episodenum|pid|channel|available|expires|duration|desc|web|thumbnail|timeadded|
 ```
 **NB:** If the cache does not index the full last-30 days of programmes when first refreshed with `get_iplayer --refresh`, try forcing a cache rebuild with `get_iplayer --cache-rebuild`.
 ### download_history

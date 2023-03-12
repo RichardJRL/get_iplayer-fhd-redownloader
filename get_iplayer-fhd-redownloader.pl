@@ -19,6 +19,7 @@ my $fhLogFile;
 my %alreadyDownloadedHighDef;
 my %alreadyDownloadedStanDef;
 my %alreadyDownloadedBothDef;
+my %cachedProgrammes;
 
 # Variables to hold comand line arguments, and their defaults if not deliberately set
 # System defaults
@@ -74,6 +75,38 @@ sub addDownloadedProgrammeData {
     # }
 
     $alreadyDownloadedHashReference->{$splitProgrammeInfoReference->[0]} = \%newProgrammeHash;
+}
+
+# Subroutine to add downloaded programme data to one of the %alreadyDownloaded... hashes
+sub addCachedProgrammeData {
+    my ($cachedProgrammeHashReference, $splitCachedProgammeReference, $fhLogFile) = @_;
+#|||||||||||||||
+
+    # Take contents of @splitProgrammeInfo array and convert them into a hash
+    my %newProgrammeHash = (
+        'index'     => $splitCachedProgammeReference->[0],
+        'type'      => $splitCachedProgammeReference->[1],
+        'name'      => $splitCachedProgammeReference->[2],
+        'episode'   => $splitCachedProgammeReference->[3],
+        'seriesnum' => $splitCachedProgammeReference->[4],
+        'episodenum' => $splitCachedProgammeReference->[5],
+        # pid is 6
+        'channel'   => $splitCachedProgammeReference->[7],
+        'available' => $splitCachedProgammeReference->[8],
+        'expires'   => $splitCachedProgammeReference->[9],
+        'duration'  => $splitCachedProgammeReference->[10],
+        'desc'      => $splitCachedProgammeReference->[11],
+        'web'       => $splitCachedProgammeReference->[12],
+        'thumbnail' => $splitCachedProgammeReference->[13],
+        'timeadded' => $splitCachedProgammeReference->[14],
+    );
+    # Quick check to see if the PID has already been downloaded (e.g I re-downloaded a deleted programme)
+    # Commented out as it makes for a very noisy log file.
+    # if(exists $alreadyDownloadedHashReference->{$splitCachedProgammeReference->[0]}) {
+    #     say $fhLogFile "Duplicate PID: Programme $splitCachedProgammeReference->[0] already added to the array ", caller($alreadyDownloadedHashReference);
+    # }
+
+    $cachedProgrammeHashReference->{$splitCachedProgammeReference->[6]} = \%newProgrammeHash;
 }
 
 ################################################################################
@@ -186,18 +219,18 @@ close $fhTempLogFile;
 # Lines not conforming to the download_history file format will be diverted to a log file
 # download_history file format for reference:
 # pid|name|episode|type|download_end_time|mode|filename|version|duration|desc|channel|categories|thumbnail|guidance|web|episodenum|seriesnum|
-my $lineCounter = 0;
+my $downloadHistorylineCounter = 0;
 
 my $fhDownloadHistory;
 open($fhDownloadHistory, '<:encoding(UTF-8)', $claDownloadHistoryFilePath);
-say $fhLogFile "Errors encountered while parsing $claDownloadHistoryFilePath file:";
+say $fhLogFile "Errors encountered while parsing the get_iplayer download_history file $claDownloadHistoryFilePath :";
 while(my $programmeInfo = <$fhDownloadHistory>) {
-    $lineCounter++;
+    $downloadHistorylineCounter++;
 
     # Check for zero-length line
     chomp $programmeInfo;
     if (length($programmeInfo) == 0) {
-        say $fhLogFile "Line $lineCounter: Blank line";
+        say $fhLogFile "Line $downloadHistorylineCounter: Blank line";
         next;
     }
 
@@ -206,7 +239,7 @@ while(my $programmeInfo = <$fhDownloadHistory>) {
     my @splitProgrammeInfo = split(/\|/, $programmeInfo, -1);
     my $numElements = scalar(@splitProgrammeInfo) - 1;
     if($numElements != 17) {
-        say $fhLogFile "Line $lineCounter: Number of elements in the line is not 17 ($numElements): $programmeInfo";
+        say $fhLogFile "Line $downloadHistorylineCounter: Number of elements in the line is not 17 ($numElements): $programmeInfo";
         next;
     }
 
@@ -254,12 +287,27 @@ say $fhLogFile '';
 
 # Search the tv.cache file for programmes are in the %alreadyDownloadedStanDef array
 # and save them to the @programmesAvailable array. 
-# my $fhTvCache
-# open($fhTvCache, '<:encoding(UTF-8)', $claTVCacheFilePath);
-# while(my $line = <$fhTvCache>) {
-#     chomp $line;
-#     # Do stuff...
-# }
+# tv.cache file format for reference
+#index|type|name|episode|seriesnum|episodenum|pid|channel|available|expires|duration|desc|web|thumbnail|timeadded|
+my $fhTvCache;
+open($fhTvCache, '<:encoding(UTF-8)', $claTVCacheFilePath);
+say $fhLogFile "Errors encountered while parsing the get_iplayer tv.cache file $claTVCacheFilePath :";
+my $tvCacheLineCounter = 0;
+while(my $cachedProgramme = <$fhTvCache>) {
+    $tvCacheLineCounter++;
+    chomp $cachedProgramme;
+    if($cachedProgramme =~ /^[0-9]+\|/)
+    {   
+        my @splitCachedProgamme = split(/\|/, $cachedProgramme, -1);
+        my $numElements = scalar(@splitCachedProgamme) - 1;
+        if($numElements != 15) {
+            say $fhLogFile "Line $tvCacheLineCounter: Number of elements in the line is not 15 ($numElements): $cachedProgramme";
+            next;
+        }
+        addCachedProgrammeData(\%cachedProgrammes, \@splitCachedProgamme, $fhLogFile);
+    }
+}
+close $fhTvCache;
 
 # # use `get_iplayer --info --pid=[PID] to check which available programmes are available in fhd quality`
 
