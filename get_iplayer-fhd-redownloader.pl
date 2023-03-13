@@ -3,6 +3,7 @@
 use strict;
 use warnings;
 use autodie;
+use Data::Dumper;
 use File::Path;
 use Getopt::Long;
 use feature 'say';
@@ -20,6 +21,7 @@ my %alreadyDownloadedHighDef;
 my %alreadyDownloadedStanDef;
 my %alreadyDownloadedBothDef;
 my %cachedProgrammes;
+my %availableProgrammes;
 
 # Variables to hold comand line arguments, and their defaults if not deliberately set
 # System defaults
@@ -80,7 +82,6 @@ sub addDownloadedProgrammeData {
 # Subroutine to add downloaded programme data to one of the %alreadyDownloaded... hashes
 sub addCachedProgrammeData {
     my ($cachedProgrammeHashReference, $splitCachedProgammeReference, $fhLogFile) = @_;
-#|||||||||||||||
 
     # Take contents of @splitProgrammeInfo array and convert them into a hash
     my %newProgrammeHash = (
@@ -285,8 +286,6 @@ foreach my $pid (keys %alreadyDownloadedBothDef) {
 say $fhLogFile "Number of programmes in the standard quality downloads array after duplicate removal is " . scalar(%alreadyDownloadedStanDef);
 say $fhLogFile '';
 
-# Search the tv.cache file for programmes are in the %alreadyDownloadedStanDef array
-# and save them to the @programmesAvailable array. 
 # tv.cache file format for reference
 #index|type|name|episode|seriesnum|episodenum|pid|channel|available|expires|duration|desc|web|thumbnail|timeadded|
 my $fhTvCache;
@@ -308,8 +307,21 @@ while(my $cachedProgramme = <$fhTvCache>) {
     }
 }
 close $fhTvCache;
+say $fhLogFile '';
+
+# Iterate over the %cachedProgrammes array to find programmes that are also are in the %alreadyDownloadedStanDef hash
+# and save them to the %availableProgrammes array, sorted by expiry (newest first).
+say $fhLogFile "Checking which programmes already downloaded in 720p quality or lower are available for download now";
+foreach my $cachedPid (keys %cachedProgrammes) {
+    if(exists $alreadyDownloadedStanDef{$cachedPid}) {
+        $availableProgrammes{$cachedPid} = $alreadyDownloadedStanDef{$cachedPid};
+    }
+}
+say $fhLogFile Dumper(%availableProgrammes);
+say $fhLogFile '';
 
 # # use `get_iplayer --info --pid=[PID] to check which available programmes are available in fhd quality`
+
 
 # Either offer an interactive prompt to chose whether to download or not (yes, no, ignore) and 
 # add the ignored programmes to an ignore file, so they are not presented upon a subsequent program run.
