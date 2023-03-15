@@ -362,26 +362,21 @@ foreach my $pid (keys %availableProgrammes) {
     say "$infoOutput";
 
     if($infoExitCode == 0) {
-        my $fhInfoOutput;
-        open($fhInfoOutput, '<', \$infoOutput);
-        while(my $infoLine = <$fhInfoOutput>) {
-            if($infoLine =~ /^qualities:.*fhd/ && $availableInFhd != 1) {
-                $availableInFhd = 1;
-                $availableInFhd{$pid} = $availableProgrammes{$pid};
-                say $fhLogFile "1080p quality version available for programme with PID $pid; \"$availableProgrammes{$pid}{'name'}\", \"$availableProgrammes{$pid}{'episode'}\"...";
-            }
-            else {
-                # say $fhLogFile ""; # Including notice of no higher quality version for all programmes might be too verbose?
-            }
+        # search --info output for fhd entry on the `qualities:` line. There may be more than one `qualities:` line but one match is sufficient.
+        if($infoOutput =~ /qualities:.*:.*fhd/) {
+            $availableInFhd = 1;
+            $availableInFhd{$pid} = $availableProgrammes{$pid};
+            say $fhLogFile "1080p quality version available for programme with PID $pid; \"$availableProgrammes{$pid}{'name'}\", \"$availableProgrammes{$pid}{'episode'}\".";
 
             # search for `qualitysizes: ... fhd=`
-            if($infoLine =~ /^qualitysizes:.*fhd=([0-9]+)MB/ && $availableInFhd == 1) {
+            if($infoOutput =~ /qualitysizes:.*:.*fhd=([0-9]+)MB/) {
                 $downloadSize = $1;
                 $availableInFhd{$pid}{'download_size'} = $downloadSize;
-                last;
             }
         }
-        close $fhInfoOutput;
+        else {
+            # say $fhLogFile ""; # Including notice of no higher quality version for all programmes might be too verbose?
+        }
     }
     else {
         # Report error, failed to get programme info in $infoMaxAttempts attempts
