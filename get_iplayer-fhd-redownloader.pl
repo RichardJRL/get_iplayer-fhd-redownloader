@@ -349,6 +349,14 @@ foreach my $pid (keys %availableProgrammes) {
         $infoAttempts++;
         $totalGetIplayerErrors++;
         # TODO: Insert subroutine here that compares totalGetIplayerErrors with maximumPermissableGetIplayerErrors and exit if greater.
+        # TODO: Do I need it as a subroutine, as this is primarily where I'm interacting with get_iplayer in a way that involves communication with the BBC iPlayer infrastructure
+        #       Future use of get_iplayer should be limited to get_iplayer --pvr-queue commands as I don't think I'll be using get_iplayer --get from within this program.
+        if($totalGetIplayerErrors > $maximumPermissableGetIplayerErrors) {
+            say $fhLogFile "ERROR: Exiting due to more than $maximumPermissableGetIplayerErrors errors while attempting to run $claExecutablePath --info --pid=[PID] commands";
+            say $fhLogFile '';
+            say "ERROR: Exiting due to more than $maximumPermissableGetIplayerErrors errors while attempting to run $claExecutablePath --info --pid=[PID] commands";
+            say "       See log for further details: $claLogFilePath";
+        }
     }
     say "get_iplayer --info exit code: $infoExitCode";
     say "$infoOutput";
