@@ -22,6 +22,9 @@ my %alreadyDownloadedStanDef;
 my %alreadyDownloadedBothDef;
 my %cachedProgrammes;
 my %availableProgrammes;
+my %availableInFhd;
+my $totalGetIplayerErrors = 0;
+my $maximumPermissableGetIplayerErrors = 50;
 
 # Variables to hold comand line arguments, and their defaults if not deliberately set
 # System defaults
@@ -79,7 +82,7 @@ sub addDownloadedProgrammeData {
     $alreadyDownloadedHashReference->{$splitProgrammeInfoReference->[0]} = \%newProgrammeHash;
 }
 
-# Subroutine to add downloaded programme data to one of the %alreadyDownloaded... hashes
+# Subroutine to add downloaded programme data to the hash storing tv.cache data
 sub addCachedProgrammeData {
     my ($cachedProgrammeHashReference, $splitCachedProgammeReference, $fhLogFile) = @_;
 
@@ -100,6 +103,7 @@ sub addCachedProgrammeData {
         'web'       => $splitCachedProgammeReference->[12],
         'thumbnail' => $splitCachedProgammeReference->[13],
         'timeadded' => $splitCachedProgammeReference->[14],
+        'download_size' => '0'
     );
     # Quick check to see if the PID has already been downloaded (e.g I re-downloaded a deleted programme)
     # Commented out as it makes for a very noisy log file.
@@ -258,7 +262,7 @@ while(my $programmeInfo = <$fhDownloadHistory>) {
         addDownloadedProgrammeData(\%alreadyDownloadedHighDef, \@splitProgrammeInfo, $fhLogFile);
     }
     # Match programmes that do not exist in fhd quality
-    else {
+    else { 
         addDownloadedProgrammeData(\%alreadyDownloadedStanDef, \@splitProgrammeInfo, $fhLogFile);
     }
 }
@@ -286,6 +290,7 @@ foreach my $pid (keys %alreadyDownloadedBothDef) {
 say $fhLogFile "Number of programmes in the standard quality downloads array after duplicate removal is " . scalar(%alreadyDownloadedStanDef);
 say $fhLogFile '';
 
+# Parse get_iplayer's tv.cache file
 # tv.cache file format for reference
 #index|type|name|episode|seriesnum|episodenum|pid|channel|available|expires|duration|desc|web|thumbnail|timeadded|
 my $fhTvCache;
@@ -311,21 +316,82 @@ say $fhLogFile '';
 
 # Iterate over the %cachedProgrammes array to find programmes that are also are in the %alreadyDownloadedStanDef hash
 # and save them to the %availableProgrammes array, sorted by expiry (newest first).
-say $fhLogFile "Checking which programmes already downloaded in 720p quality or lower are available for download now";
+say $fhLogFile "Checking which programmes already downloaded in 720p quality or lower are available for download now...";
 foreach my $cachedPid (keys %cachedProgrammes) {
     if(exists $alreadyDownloadedStanDef{$cachedPid}) {
-        $availableProgrammes{$cachedPid} = $alreadyDownloadedStanDef{$cachedPid};
+        $availableProgrammes{$cachedPid} = $cachedProgrammes{$cachedPid};
     }
 }
-say $fhLogFile Dumper(%availableProgrammes);
+# say $fhLogFile Dumper(%availableProgrammes);
+say $fhLogFile "Number of already downloaded programmes which are available now is " . scalar(%availableProgrammes);
 say $fhLogFile '';
 
 # # use `get_iplayer --info --pid=[PID] to check which available programmes are available in fhd quality`
+say $fhLogFile "Checking which already downloaded programmes are available for download in 1080p quality now...";
+foreach my $pid (keys %availableProgrammes) {
+    # TODO: Check PID against ignore.list programmes...
 
+    # get programme info
+    my $infoCommand = "$claExecutablePath --info --pid=$pid";
+    my $infoOutput = `$infoCommand`;
+    my $infoExitCode = 1;
+    my $infoAttempts = 0;
+    my $infoMaxAttempts = 4;
+    my $availableInFhd = 0;
+    my $downloadSize = 0;
+
+    say $fhLogFile "";
+    say $fhLogFile "Querying get_iplayer for information about available programme with PID $pid; \"$availableProgrammes{$pid}{'name'}\", \"$availableProgrammes{$pid}{'episode'}\"...";
+    # Get programme info, repeating a maximum of $infoMaxAttempts in case of failure
+    while($infoExitCode != 0 && $infoAttempts < $infoMaxAttempts) {
+        $infoOutput = `$infoCommand`;
+        $infoExitCode = $? >> 8;
+        $infoAttempts++;
+        $totalGetIplayerErrors++;
+        # TODO: Insert subroutine here that compares totalGetIplayerErrors with maximumPermissableGetIplayerErrors and exit if greater.
+    }
+    say "get_iplayer --info exit code: $infoExitCode";
+    say "$infoOutput";
+
+    if($infoExitCode == 0) {
+        my $fhInfoOutput;
+        open($fhInfoOutput, '<', \$infoOutput);
+        while(my $infoLine = <$fhInfoOutput>) {
+            if($infoLine =~ /^qualities:.*fhd/ && $availableInFhd != 1) {
+                $availableInFhd = 1;
+                $availableInFhd{$pid} = $availableProgrammes{$pid};
+                say $fhLogFile "1080p quality version available for programme with PID $pid; \"$availableProgrammes{$pid}{'name'}\", \"$availableProgrammes{$pid}{'episode'}\"...";
+            }
+            else {
+                # say $fhLogFile ""; # Including notice of no higher quality version for all programmes might be too verbose?
+            }
+
+            # search for `qualitysizes: ... fhd=`
+            if($infoLine =~ /^qualitysizes:.*fhd=([0-9]+)MB/ && $availableInFhd == 1) {
+                $downloadSize = $1;
+                $availableInFhd{$pid}{'download_size'} = $downloadSize;
+                last;
+            }
+        }
+        close $fhInfoOutput;
+    }
+    else {
+        # Report error, failed to get programme info in $infoMaxAttempts attempts
+        say $fhLogFile "Failed $infoMaxAttempts times to get programme information for TV programme $pid; \"$availableProgrammes{$pid}{'name'}\", \"$availableProgrammes{$pid}{'episode'}\"";
+    }
+}
+
+say $fhLogFile '';
+say $fhLogFile "There are " . scalar(%availableInFhd) . " programmes available for re-download in 1080p quality.";
+say $fhLogFile '';
 
 # Either offer an interactive prompt to chose whether to download or not (yes, no, ignore) and 
 # add the ignored programmes to an ignore file, so they are not presented upon a subsequent program run.
 # First, parse the ignore file if it exists...
+
+foreach my $fhdPid (keys %availableInFhd) {
+    say "foo";
+}
 
 # Then offer the choices, add to pvr-queue
 
