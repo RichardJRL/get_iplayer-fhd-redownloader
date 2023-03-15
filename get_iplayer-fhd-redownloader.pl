@@ -23,6 +23,7 @@ my %alreadyDownloadedBothDef;
 my %cachedProgrammes;
 my %availableProgrammes;
 my %availableInFhd;
+my %ignoreList;
 my $totalGetIplayerErrors = 0;
 my $maximumPermissableGetIplayerErrors = 50;
 
@@ -51,6 +52,7 @@ my $claIgnoreListFilePath = $claRedownloaderDir . 'ignore.list';
 ################################################################################
 
 # Subroutine to add downloaded programme data to one of the %alreadyDownloaded... hashes
+# Re-using the file format for the ignore.list file too.
 sub addDownloadedProgrammeData {
     my ($alreadyDownloadedHashReference, $splitProgrammeInfoReference, $fhLogFile) = @_;
     
@@ -73,11 +75,6 @@ sub addDownloadedProgrammeData {
         'episodenum' => $splitProgrammeInfoReference->[15],
         'seriesnum'  => $splitProgrammeInfoReference->[16]
     );
-    # Quick check to see if the PID has already been downloaded (e.g I re-downloaded a deleted programme)
-    # Commented out as it makes for a very noisy log file.
-    # if(exists $alreadyDownloadedHashReference->{$splitProgrammeInfoReference->[0]}) {
-    #     say $fhLogFile "Duplicate PID: Programme $splitProgrammeInfoReference->[0] already added to the array ", caller($alreadyDownloadedHashReference);
-    # }
 
     $alreadyDownloadedHashReference->{$splitProgrammeInfoReference->[0]} = \%newProgrammeHash;
 }
@@ -105,11 +102,6 @@ sub addCachedProgrammeData {
         'timeadded' => $splitCachedProgammeReference->[14],
         'download_size' => '0'
     );
-    # Quick check to see if the PID has already been downloaded (e.g I re-downloaded a deleted programme)
-    # Commented out as it makes for a very noisy log file.
-    # if(exists $alreadyDownloadedHashReference->{$splitCachedProgammeReference->[0]}) {
-    #     say $fhLogFile "Duplicate PID: Programme $splitCachedProgammeReference->[0] already added to the array ", caller($alreadyDownloadedHashReference);
-    # }
 
     $cachedProgrammeHashReference->{$splitCachedProgammeReference->[6]} = \%newProgrammeHash;
 }
@@ -225,9 +217,9 @@ close $fhTempLogFile;
 # download_history file format for reference:
 # pid|name|episode|type|download_end_time|mode|filename|version|duration|desc|channel|categories|thumbnail|guidance|web|episodenum|seriesnum|
 my $downloadHistorylineCounter = 0;
-
 my $fhDownloadHistory;
 open($fhDownloadHistory, '<:encoding(UTF-8)', $claDownloadHistoryFilePath);
+say $fhLogFile "Parsing the get_iplayer download_history file $claDownloadHistoryFilePath";
 say $fhLogFile "Errors encountered while parsing the get_iplayer download_history file $claDownloadHistoryFilePath :";
 while(my $programmeInfo = <$fhDownloadHistory>) {
     $downloadHistorylineCounter++;
@@ -235,7 +227,7 @@ while(my $programmeInfo = <$fhDownloadHistory>) {
     # Check for zero-length line
     chomp $programmeInfo;
     if (length($programmeInfo) == 0) {
-        say $fhLogFile "Line $downloadHistorylineCounter: Blank line";
+        say $fhLogFile "download_history line $downloadHistorylineCounter: Blank line";
         next;
     }
 
@@ -244,7 +236,7 @@ while(my $programmeInfo = <$fhDownloadHistory>) {
     my @splitProgrammeInfo = split(/\|/, $programmeInfo, -1);
     my $numElements = scalar(@splitProgrammeInfo) - 1;
     if($numElements != 17) {
-        say $fhLogFile "Line $downloadHistorylineCounter: Number of elements in the line is not 17 ($numElements): $programmeInfo";
+        say $fhLogFile "download_history line $downloadHistorylineCounter: Number of elements in the line is not 17 ($numElements): $programmeInfo";
         next;
     }
 
@@ -326,10 +318,52 @@ foreach my $cachedPid (keys %cachedProgrammes) {
 say $fhLogFile "Number of already downloaded programmes which are available now is " . scalar(%availableProgrammes);
 say $fhLogFile '';
 
+# Open the ignore.list file for reading, parse contents.
+# NB: Reusing the download_history file format for the ignore.list
+if(-f $claIgnoreListFilePath) {
+    say $fhLogFile "Parsing ignore.list file";
+    my $fhReadIgnoreList;
+    my $ignoreListlineCounter = 0;
+    open($fhReadIgnoreList, '<:encoding(UTF-8)', $claIgnoreListFilePath);
+    while(my $ignoreListLine = <$fhReadIgnoreList>) {
+        $ignoreListlineCounter++;
+
+        # Check for zero-length line
+        chomp $ignoreListLine;
+        if (length($ignoreListLine) == 0) {
+            say $fhLogFile "ignore.list line $ignoreListlineCounter: Blank line";
+            next;
+        }
+
+        # Check for 17 elements in the splitIgnoreListLine array
+        # Need '-1' to ensure empty fields in the file format are still translated into elements in the array
+        my @splitIgnoreListLine = split(/\|/, $ignoreListLine, -1);
+        my $numElements = scalar(@splitIgnoreListLine) - 1;
+        if($numElements != 17) {
+            say $fhLogFile "ignore.list line $ignoreListlineCounter: Number of elements in the line is not 17 ($numElements): $ignoreListLine";
+            next;
+        }
+        
+        # Reusing the download_history file format for the ignore.list file
+        addDownloadedProgrammeData(\%ignoreList, \@splitIgnoreListLine, $fhLogFile);
+    }
+    close $fhReadIgnoreList;
+    say $fhLogFile '';
+}
+
 # # use `get_iplayer --info --pid=[PID] to check which available programmes are available in fhd quality`
 say $fhLogFile "Checking which already downloaded programmes are available for download in 1080p quality now...";
+say "Checking which already downloaded programmes are available for download in 1080p quality now...";
+say "Detailed progress can be monitored in a separate window with the command `tail -f $claLogFilePath`";
+say "Please be patient, this may take some time...";
 foreach my $pid (keys %availableProgrammes) {
-    # TODO: Check PID against ignore.list programmes...
+    # Check PID against ignore.list programmes...
+    if(exists $ignoreList{$pid}) {
+        # This PID is present in the ignore.list file
+        say $fhLogFile "Programme with PID $pid; \"$availableProgrammes{$pid}{'name'}, $availableProgrammes{$pid}{'episode'}\" is in the ignore list; skipping...";
+        say $fhLogFile '';
+        next;
+    }
 
     # get programme info
     my $infoCommand = "$claExecutablePath --info --pid=$pid";
@@ -341,7 +375,7 @@ foreach my $pid (keys %availableProgrammes) {
     my $downloadSize = 0;
 
     say $fhLogFile "";
-    say $fhLogFile "Querying get_iplayer for information about available programme with PID $pid; \"$availableProgrammes{$pid}{'name'}\", \"$availableProgrammes{$pid}{'episode'}\"...";
+    say $fhLogFile "Querying get_iplayer for information about available programme with PID $pid; \"$availableProgrammes{$pid}{'name'}, $availableProgrammes{$pid}{'episode'}\"...";
     # Get programme info, repeating a maximum of $infoMaxAttempts in case of failure
     while($infoExitCode != 0 && $infoAttempts < $infoMaxAttempts) {
         $infoOutput = `$infoCommand`;
@@ -358,15 +392,15 @@ foreach my $pid (keys %availableProgrammes) {
             say "       See log for further details: $claLogFilePath";
         }
     }
-    say "get_iplayer --info exit code: $infoExitCode";
-    say "$infoOutput";
+    # say "get_iplayer --info exit code: $infoExitCode";
+    # say "$infoOutput";
 
     if($infoExitCode == 0) {
         # search --info output for fhd entry on the `qualities:` line. There may be more than one `qualities:` line but one match is sufficient.
         if($infoOutput =~ /qualities:.*:.*fhd/) {
             $availableInFhd = 1;
             $availableInFhd{$pid} = $availableProgrammes{$pid};
-            say $fhLogFile "1080p quality version available for programme with PID $pid; \"$availableProgrammes{$pid}{'name'}\", \"$availableProgrammes{$pid}{'episode'}\".";
+            say $fhLogFile "1080p quality version available for programme with PID $pid; \"$availableProgrammes{$pid}{'name'}, $availableProgrammes{$pid}{'episode'}\".";
 
             # search for `qualitysizes: ... fhd=`
             if($infoOutput =~ /qualitysizes:.*:.*fhd=([0-9]+)MB/) {
@@ -380,7 +414,7 @@ foreach my $pid (keys %availableProgrammes) {
     }
     else {
         # Report error, failed to get programme info in $infoMaxAttempts attempts
-        say $fhLogFile "Failed $infoMaxAttempts times to get programme information for TV programme $pid; \"$availableProgrammes{$pid}{'name'}\", \"$availableProgrammes{$pid}{'episode'}\"";
+        say $fhLogFile "Failed $infoMaxAttempts times to get programme information for TV programme $pid; \"$availableProgrammes{$pid}{'name'}, $availableProgrammes{$pid}{'episode'}\"";
     }
 }
 
@@ -388,13 +422,19 @@ say $fhLogFile '';
 say $fhLogFile "There are " . scalar(%availableInFhd) . " programmes available for re-download in 1080p quality.";
 say $fhLogFile '';
 
-# Either offer an interactive prompt to chose whether to download or not (yes, no, ignore) and 
+# Offer an interactive prompt to chose whether to download or not (yes, no, ignore, quit) and 
 # add the ignored programmes to an ignore file, so they are not presented upon a subsequent program run.
-# First, parse the ignore file if it exists...
 
+# Create/open the ignore.list file for appending
+my $fhAppendIgnoreList;
+open($fhAppendIgnoreList, '>>encoding:UTF-8', $claIgnoreListFilePath);
+
+# Offer user a 
 foreach my $fhdPid (keys %availableInFhd) {
     say "foo";
 }
+
+close $fhAppendIgnoreList;
 
 # Then offer the choices, add to pvr-queue
 
