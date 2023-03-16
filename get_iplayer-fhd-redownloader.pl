@@ -231,6 +231,7 @@ close $fhTempLogFile;
 # pid|name|episode|type|download_end_time|mode|filename|version|duration|desc|channel|categories|thumbnail|guidance|web|episodenum|seriesnum|
 my $downloadHistorylineCounter = 0;
 my $fhDownloadHistory;
+my $downloadHistoryErrorCounter = 0;
 open($fhDownloadHistory, '<:encoding(UTF-8)', $claDownloadHistoryFilePath);
 say $fhLogFile "Parsing the get_iplayer download_history file $claDownloadHistoryFilePath";
 say $fhLogFile "Errors encountered while parsing the get_iplayer download_history file $claDownloadHistoryFilePath :";
@@ -241,6 +242,7 @@ while(my $programmeInfo = <$fhDownloadHistory>) {
     chomp $programmeInfo;
     if (length($programmeInfo) == 0) {
         say $fhLogFile "download_history line $downloadHistorylineCounter: Blank line.";
+        downloadHistoryErrorCounter++;
         next;
     }
 
@@ -250,6 +252,7 @@ while(my $programmeInfo = <$fhDownloadHistory>) {
     my $numElements = scalar(@splitProgrammeInfo) - 1;
     if($numElements != 17) {
         say $fhLogFile "download_history line $downloadHistorylineCounter: Number of elements in the line is not 17 ($numElements): $programmeInfo";
+        $downloadHistoryErrorCounter++;
         next;
     }
 
@@ -274,6 +277,12 @@ while(my $programmeInfo = <$fhDownloadHistory>) {
 close $fhDownloadHistory;
 say $fhLogFile '';
 
+# Summarise download_history errors for terminal output
+if ($downloadHistoryErrorCounter != 0) {
+    say "Warning: $downloadHistoryErrorCounter errors encountered while parsing get_iplayer's download_history file at $claDownloadHistoryFilePath";
+    say "Warning: Check the fhd-redownloader activity log for further details at $claLogFilePath";
+}
+
 # Search the %alreadyDownloadedStanDef array for any programmes that have already been 
 # re-downloaded in fhd quality and are present in the %alreadyDownloadedHighDef array
 foreach my $pid (keys %alreadyDownloadedHighDef) {
@@ -282,6 +291,11 @@ foreach my $pid (keys %alreadyDownloadedHighDef) {
     }
 }
 # Summarise progress
+# Terminal output
+say "Number of TV programmes already downloaded in standard quality is " . scalar(%alreadyDownloadedStanDef);
+say "Number of TV programmes already downloaded in FullHD quality is " . scalar(%alreadyDownloadedHighDef);
+say "Number of TV programmes already downloaded in both standard quality and FullHD is " . scalar(%alreadyDownloadedBothDef);
+# Log file output
 say $fhLogFile "Summary of $claDownloadHistoryFilePath file parsing:";
 say $fhLogFile "Number of programmes in the standard quality downloads array is " . scalar(%alreadyDownloadedStanDef);
 say $fhLogFile "Number of programmes in the full HD  quality downloads array is " . scalar(%alreadyDownloadedHighDef);
@@ -323,6 +337,10 @@ while(my $cachedProgramme = <$fhTvCache>) {
     }
 }
 close $fhTvCache;
+# Terminal output
+say "Number of TV programmes in the cache is " . scalar(%cachedProgrammes);
+# Log file output
+say $fhLogFile "Number of TV programmes in the cache is " . scalar(%cachedProgrammes);
 say $fhLogFile '';
 
 # Iterate over the %cachedProgrammes array to find programmes that are also are in the %alreadyDownloadedStanDef hash
@@ -334,7 +352,10 @@ foreach my $cachedPid (keys %cachedProgrammes) {
     }
 }
 # say $fhLogFile Dumper(%availableProgrammes);
-say $fhLogFile "Number of already downloaded programmes which are available now is " . scalar(%availableProgrammes);
+# Terminal output
+say "Number of already downloaded TV programmes which are available now is " . scalar(%availableProgrammes);
+# Log file output
+say $fhLogFile "Number of already downloaded TV programmes which are available now is " . scalar(%availableProgrammes);
 say $fhLogFile '';
 
 # Open the ignore.list file for reading, parse contents.
@@ -367,6 +388,9 @@ if(-f $claIgnoreListFilePath) {
         addDownloadedProgrammeData(\%ignoreList, \@splitIgnoreListLine, $fhLogFile);
     }
     close $fhReadIgnoreList;
+    # Terminal output
+    say "There are " . scalar(%ignoreList) . " programmes in the ignore list.";
+    # Log file output
     say $fhLogFile "There are " . scalar(%ignoreList) . " programmes in the ignore list.";
     say $fhLogFile '';
 }
@@ -374,7 +398,6 @@ if(-f $claIgnoreListFilePath) {
 # # use `get_iplayer --info --pid=[PID] to check which available programmes are available in fhd quality`
 say $fhLogFile "Checking which already downloaded programmes are available for download in 1080p quality now...";
 say "Checking which already downloaded programmes are available for download in 1080p quality now...";
-say "Detailed progress can be monitored in a separate window with the command `tail -f $claLogFilePath`";
 say "Please be patient, this may take a (very) long time...";
 # TODO: Implement Storable module to save progress with each iteration and reload on future runs?
 my $numAvailableProgrammes = scalar(%availableProgrammes);
@@ -604,5 +627,4 @@ if ($numProgrammesAddedToPvr > 0) {
     }
 }
 
-# TODO: In the terminal give a visual indication that the --info gathering is continuing.
 # TODO: Sort the availableProgrammes and/or availableInFhd array by the expires field
