@@ -1,30 +1,70 @@
 # get_iplayer-fhd-redownloader Description
 
-This is a Perl script to parse a `~/.get_iplayer/download_history` file and extract a list of all TV programmes that have not been downloaded in the newer `--tv-quality=fhd` 1080p resolution, which is indicated in the `download_history` file by 
+## Summary
+A program to parse a `get_iplayer` download_history file and re-download previously downloaded programmes that are currently available in the new FullHD 1080p quality option offered by the BBC.
+
+It offers the user an interactive choice for what to do for each programme found available in the new FullHD 1080p quality:
+1. Download it
+2. Don't download it
+3. Ignore it (remember not to ask the user about it again on subsequent runs)
+4. Stop processing programmes and quit.
+
+**NB:** `get_iplayer` must be installed on the system that this program is run on. This program relies on it being properly configured and will respect currently defined preferences such as download directories, metadata downloading etc. which are saved in the user's `~/.get_iplayer/options` file.
+## Usage
+### Command Line Arguments & Files Used
+The program will run without any of the command line arguments being specified - and will only alert the user to provide the locations of essential files if it can't find them in their default locations.
+
+It requires read-only access to two `get_iplayer` created files:
+- `~/.get_iplayer/download_history`
+- `~/.get_iplayer/tv.cache`
+It writes to two new files in a new subdirectory of the user's hidden `~/.get_iplayer` directory:
+- `~/.get_iplayer/fhd-redownloader/ignore.list`
+- `~/.get_iplayer/fhd-redownloader/activity.log`
+
+```
+# The get_iplayer executable:
+--get_iplayer-executable-path [/path/to/get_iplayer]
+
+# get_iplayer files:
+--download-history [/path/to/get_iplayer's/download_history]
+--tv-cache [/path/to/get_iplayer's/tv.cache]
+
+# fhd-redownloader files:
+--log-file [/path/to/fhd-redownloader's_log_file]
+--ignore-list [/path/to/fhd-redownloader's_ignore_list]
+```
+### Usage Examples
+```
+# Default operation:
+perl get_iplayer-fhd-redownloader.pl
+
+# Specify a custom location for get_iplayer and the fhd-redownloader log file:
+perl get_iplayer-fhd-redownloader.pl --get_iplayer-executable-path /tmp/get_iplayer --log-file /tmp/activity.log
+```
+## Detailed Description
+
+This is a Perl script to parse a `~/.get_iplayer/download_history` file and extract a list of all TV programmes that have not been downloaded in the newer `--tv-quality=fhd` 1080p resolution, which is indicated in the `download_history` file by:
 - `dashfhd[1-3]`
 - `hlsfhd[1-3]`
 
-NB: In the `download_history` file, 
+**NB:** In the `download_history` file, the following are earlier quality descriptors that refer only to 720p resolution downloads despite the `fhd` portion of their name:
 - `hvfhd[1-3]`
 - `dvfhd[1-3]`
-  
-are earlier quality descriptors that refer to 720p resolution downloads.
 
-Aside: `cat ~/.get_iplayer/download_history | awk -F '|' '{print $6}' | grep fhd | sort | uniq` will summarise the range of `fhd` quality descriptors, for both 720p and 1080p, that are already in the `download_history` file.
+**Aside:** `cat ~/.get_iplayer/download_history | awk -F '|' '{print $6}' | grep fhd | sort | uniq` will summarise the range of `fhd` quality descriptors, for both 720p and 1080p, that are already in the `download_history` file.
 
 The Perl script will then take the list of TV programme PIDs that have not been downloaded in 1080p and search the `~/.get_iplayer/tv.cache` file to see if any are currently available on iPlayer.
 
-After assembling a list of those TV programmes not already downloaded which are available on iPlayer, it will run the command `get_iplayer --info --pid=[PID]` to discover if they are now available in the new `fhd` 1080p resolution.
+After assembling a list of those TV programmes not already downloaded which are currently available on iPlayer, it will run the command `get_iplayer --info --pid=[PID]` to discover if they are now available in the new `fhd` 1080p resolution. This may take a *very, very* long time.
 
-Aside: After running the command `get_iplayer --info --pid=[PID]`, the line containing the relevant information begins `qualities:`, e.g.
+**Aside:** Batching PIDs in the `get_iplayer --info --pid=[PID1],[PID2],[PID3]` command does not appear to speed up the process. In my testing, it merely makes the process of retrieving programme information more error prone.
+
+**Aside:** After running the command `get_iplayer --info --pid=[PID]`, the line containing the relevant information begins `qualities:`, e.g.
 `qualities:       original: fhd,hd,sd,web,mobile`
 
-If they are not available in `fhd`, it will optionally add their details to a new `~/.get_iplayer/tv.no_fhd` file, to avoid future redownloading attempts.
-If they are available in `fhd`, it will either
-- Download them immediately with the command `get_iplayer --get --tv-quality=fhd --force --pid=[PID]`, or
-- Queue them for download with the command `get_iplayer --pvr-queue --tv-quality=fhd --force --pid=[PID]`
-depending on user preference.
+If currently available programmes are available in `fhd`, it will queue them for download with the command `get_iplayer --pvr-queue --tv-quality=fhd --force --pid=[PID]`. Explicitly setting `--tv-quality=fhd` ensures that only the `fhd` version will be downloaded, and no bandwidth will be wasted on re-downloading any lower-quality version.
 
+After asking the user for what to do with each available programme, the program will offer to run the `get_iplayer --pvr` command as it exits. However, it may be better to schedule this as a background cronjob, rather than running immediately. Or to ensure that a utility such as `screen` or `tmux` is used to guard against disruption to what may be a very large and lengthy download.
 # References:
 ## File Formats
 ### tv.cache
@@ -73,3 +113,5 @@ These are the only problematic PIDs in 11000 line `download_history` file that s
 ## Links
 - get_iplayer [GitHub](https://github.com/get-iplayer/get_iplayer)
 - get_iplayer [Wiki](https://github.com/get-iplayer/get_iplayer/wiki)
+- BBC Programme Identifiers [(PIDs)](https://en.wikipedia.org/wiki/BBC_Programme_Identifier)
+  
