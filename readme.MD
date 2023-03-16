@@ -1,13 +1,15 @@
 # get_iplayer-fhd-redownloader Description
 
 ## Summary
-A program to parse a [`get_iplayer`](https://github.com/get-iplayer/get_iplayer) download_history file and re-download previously downloaded programmes that are currently available in the new FullHD 1080p quality option offered by the BBC.
+A program that parse a [`get_iplayer`](https://github.com/get-iplayer/get_iplayer) download_history file offers to re-download previously downloaded programmes that are currently available in the new FullHD 1080p quality option offered by the BBC.
 
 It offers the user an interactive choice for what to do for each programme found available in the new FullHD 1080p quality:
 1. Download it
 2. Don't download it
 3. Ignore it (remember not to ask the user about it again on subsequent runs)
 4. Stop processing programmes and quit.
+
+The programmes offered for download are sorted by soonest-expiring first, so even if the user quits before reviewing the entire list, the most urgent programmes have always been presented to them. 
 
 **NB:** `get_iplayer` must be installed on the system that this program is run on. This program relies on it being properly configured and will respect currently defined preferences such as download directories, metadata downloading etc. which are saved in the user's `~/.get_iplayer/options` file.
 ## Usage
@@ -109,5 +111,6 @@ These are the only problematic TV programme PIDs discovered in an 11000 line `do
 ## Links
 - get_iplayer [GitHub](https://github.com/get-iplayer/get_iplayer)
 - get_iplayer [Wiki](https://github.com/get-iplayer/get_iplayer/wiki)
+- get_iplayer [recording quality information](https://github.com/get-iplayer/get_iplayer/wiki/modes)
 - BBC Programme Identifiers [(PIDs)](https://en.wikipedia.org/wiki/BBC_Programme_Identifier)
   
