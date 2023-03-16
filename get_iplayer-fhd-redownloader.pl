@@ -6,6 +6,8 @@ use autodie;
 use Data::Dumper;
 use File::Path;
 use Getopt::Long;
+use Time::Piece;
+use Time::Seconds;
 use feature 'say';
 #use File::Spec;
 
@@ -242,7 +244,7 @@ while(my $programmeInfo = <$fhDownloadHistory>) {
     chomp $programmeInfo;
     if (length($programmeInfo) == 0) {
         say $fhLogFile "download_history line $downloadHistorylineCounter: Blank line.";
-        downloadHistoryErrorCounter++;
+        $downloadHistoryErrorCounter++;
         next;
     }
 
@@ -265,13 +267,16 @@ while(my $programmeInfo = <$fhDownloadHistory>) {
     #     }
     # }
 
-    # Match programmes already downloaded in fhd quality
-    if($programmeInfo =~ /^[a-zA-Z0-9]{8}\|.*\|.*\|tv\|.*\|(dashfhd[0-9]|hlsfhd[0-9])/) {
-        addDownloadedProgrammeData(\%alreadyDownloadedHighDef, \@splitProgrammeInfo, $fhLogFile);
-    }
-    # Match programmes that do not exist in fhd quality
-    else { 
-        addDownloadedProgrammeData(\%alreadyDownloadedStanDef, \@splitProgrammeInfo, $fhLogFile);
+    # Limit matches to TV programmes, exclude radio programmes
+    if($programmeInfo =~ /^[a-zA-Z0-9]{8}\|.*\|.*\|tv\|/) {
+        # Match programmes already downloaded in fhd quality
+        if($programmeInfo =~ /^[a-zA-Z0-9]{8}\|.*\|.*\|tv\|.*\|(dashfhd[0-9]|hlsfhd[0-9])/) {
+            addDownloadedProgrammeData(\%alreadyDownloadedHighDef, \@splitProgrammeInfo, $fhLogFile);
+        }
+        # Match programmes that do not exist in fhd quality
+        else { 
+            addDownloadedProgrammeData(\%alreadyDownloadedStanDef, \@splitProgrammeInfo, $fhLogFile);
+        }
     }
 }
 close $fhDownloadHistory;
@@ -480,6 +485,11 @@ foreach my $pid (keys %availableProgrammes) {
 say $fhLogFile "There are " . scalar(%availableInFhd) . " programmes available for re-download in 1080p quality.";
 say $fhLogFile '';
 
+# Sort the programmes in the availableInFhd hash so that the ones with the shortest expiry date can be presented to the user first.
+my @sortedAvailableInFhdArray = sort {
+    $availableInFhd{$a}{'expires'} <=> $availableInFhd{$b}{'expires'}
+} keys %availableInFhd;
+
 # Offer an interactive prompt to chose whether to download or not (yes, no, ignore, quit) and 
 # add the ignored programmes to an ignore file, so they are not presented upon a subsequent program run.
 
@@ -491,11 +501,28 @@ open($fhAppendIgnoreList, '>>encoding(UTF-8)', $claIgnoreListFilePath);
 # Choices (yes, no, ignore, quit)
 # download_history file format for reference:
 # pid|name|episode|type|download_end_time|mode|filename|version|duration|desc|channel|categories|thumbnail|guidance|web|episodenum|seriesnum|
-foreach my $fhdPid (keys %availableInFhd) {
+foreach my $fhdPid (@sortedAvailableInFhdArray) {
+    # Clearly display the programme expiry time
+    # Current time (epoch seconds)
+    my $currentTime = time();
+    # Expiry time (epoch seconds)
+    my $expiryTime = $availableInFhd{$fhdPid}{expires};
+    # Time difference in seconds
+    my $differenceTime = $expiryTime - $currentTime;
+
+    # Create a Time::Seconds object from the difference in seconds
+    my $differenceTimeObj = Time::Seconds->new($differenceTime);
+
+    # Format the time difference in whole days, remainder hours and remainder minutes.
+    my $expiryDays = int($differenceTimeObj / 86400);
+    my $expiryRemainderHours = int(($differenceTimeObj % 86400) / 3600);
+    my $expiryRemainderMinutes = int(($differenceTimeObj % 3600) / 60);
+
     say '';
     say "Programme PID $fhdPid \"$availableInFhd{$fhdPid}{'name'}, $availableInFhd{$fhdPid}{'episode'}\" is available in 1080p quality.";
     say "The total download size of programmes already added to get_iplayer's pvr-queue in this session is estimated to be " . prettyFileSize($cumulativeDownloadSize) . '.';
     say "The download size of this programme is estimated to be " . prettyFileSize($availableInFhd{$fhdPid}{'download_size'}) . '.';
+    say "The programme expires from iPlayer in $expiryDays days, $expiryRemainderHours hours and $expiryRemainderMinutes minutes at " . localtime($expiryTime);
     say "Would you like to add it to the download queue?";
     say "[y]es    - add it to the download queue.";
     say "[n]o     - do not download it this time (DEFAULT).";
@@ -588,7 +615,7 @@ foreach my $fhdPid (keys %availableInFhd) {
         # Terminal output
         say "Not processing any more programmes...";
         # Log file output
-        say $fhLogFile "User requested to quit before processing all availalbe programmes...";
+        say $fhLogFile "User requested to quit before processing all available programmes...";
         last;
     }
     say '';
