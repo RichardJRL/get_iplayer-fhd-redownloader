@@ -26,7 +26,8 @@ my %availableInFhd;
 my %ignoreList;
 my $totalGetIplayerErrors = 0;
 my $maximumPermissableGetIplayerErrors = 50;
-
+my $cumulativeDownloadSize = 0;
+my $numProgrammesAddedToPvr = 0;
 # Variables to hold comand line arguments, and their defaults if not deliberately set
 # System defaults
 # my $claExecutablePath = '/usr/bin/get_iplayer';
@@ -40,7 +41,7 @@ my $maximumPermissableGetIplayerErrors = 50;
 # Testing overrides
 my $claExecutablePath = '/usr/bin/get_iplayer';
 my $claDataDir = './get_iplayer_test_files';
-my $claDownloadHistoryFilePath = $claDataDir . '/download_history';
+my $claDownloadHistoryFilePath = $claDataDir . '/download_history_shortened';
 my $claTVCacheFilePath = $claDataDir . '/tv.cache';
 my $claRedownloaderDir = $claDataDir . '/fhd-redownloader/';
 my $claLogFilePath = $claRedownloaderDir . 'activity.log';
@@ -106,6 +107,19 @@ sub addCachedProgrammeData {
     $cachedProgrammeHashReference->{$splitCachedProgammeReference->[6]} = \%newProgrammeHash;
 }
 
+# Subroutine to display a file size in a human-readable format
+sub prettyFileSize {
+    my $inputFileSize = shift(@_);
+    if ($inputFileSize < 2048 ) {
+        # Format in MB
+        return sprintf("%.0f", $inputFileSize) . " MB";
+    }
+    else {
+        # Format in GB
+        return sprintf("%.1f", $inputFileSize/1024) . " GB";
+    }
+}
+
 ################################################################################
 # Main Program
 ################################################################################
@@ -143,11 +157,11 @@ say $fhTempLogFile "Checking for the get_iplayer executable...";
 if(-e $claExecutablePath) {
     say $fhTempLogFile "get_iplayer executable exists at $claExecutablePath";
     if(!-x $claExecutablePath) {
-        say $fhTempLogFile "Error: The get_iplayer executable exits at the path $claExecutablePath but get_iplayer is not executable";
+        say $fhTempLogFile "Error: The get_iplayer executable exits at the path $claExecutablePath but get_iplayer is not executable.";
         $pathErrorCounter++;
     }
     else {
-        say $fhTempLogFile "get_iplayer executable exists at $claExecutablePath and is executable"
+        say $fhTempLogFile "get_iplayer executable exists at $claExecutablePath and is executable.";
     }
 }
 else {
@@ -169,7 +183,7 @@ else {
 # Check the .get_iplayer/download_history file exists. Nothing to do if it can't be parsed.
 say $fhTempLogFile "Checking for the get_iplayer download history file...";
 if(!-f $claDownloadHistoryFilePath) {
-    say $fhTempLogFile "Error: The get_iplayer download history file $claDownloadHistoryFilePath does not exist";
+    say $fhTempLogFile "Error: The get_iplayer download history file $claDownloadHistoryFilePath does not exist.";
     $pathErrorCounter++;
 }
 else {
@@ -199,13 +213,12 @@ else {
 
 # If errors encountered when checking for essential files and directories, print log to stdout and exit.
 if($pathErrorCounter != 0) {
-    say $fhTempLogFile "Exiting prematurely due to $pathErrorCounter errors encountered while checking for essential file and directory paths";
+    say $fhTempLogFile "Exiting prematurely due to $pathErrorCounter errors encountered while checking for essential file and directory paths.";
     say $tempLogFile;
     exit;
 }
 
 # Setup permanent log file
-# TODO: Change from overwrite to append mode >>
 open($fhLogFile, '>>:encoding(UTF-8)', $claLogFilePath);
 # Copy everything from the $tempLogFile variable to the actual log file
 say $fhLogFile $tempLogFile;
@@ -227,7 +240,7 @@ while(my $programmeInfo = <$fhDownloadHistory>) {
     # Check for zero-length line
     chomp $programmeInfo;
     if (length($programmeInfo) == 0) {
-        say $fhLogFile "download_history line $downloadHistorylineCounter: Blank line";
+        say $fhLogFile "download_history line $downloadHistorylineCounter: Blank line.";
         next;
     }
 
@@ -321,7 +334,7 @@ say $fhLogFile '';
 # Open the ignore.list file for reading, parse contents.
 # NB: Reusing the download_history file format for the ignore.list
 if(-f $claIgnoreListFilePath) {
-    say $fhLogFile "Parsing ignore.list file";
+    say $fhLogFile "Parsing ignore.list file.";
     my $fhReadIgnoreList;
     my $ignoreListlineCounter = 0;
     open($fhReadIgnoreList, '<:encoding(UTF-8)', $claIgnoreListFilePath);
@@ -331,7 +344,7 @@ if(-f $claIgnoreListFilePath) {
         # Check for zero-length line
         chomp $ignoreListLine;
         if (length($ignoreListLine) == 0) {
-            say $fhLogFile "ignore.list line $ignoreListlineCounter: Blank line";
+            say $fhLogFile "ignore.list line $ignoreListlineCounter: Blank line.";
             next;
         }
 
@@ -348,6 +361,7 @@ if(-f $claIgnoreListFilePath) {
         addDownloadedProgrammeData(\%ignoreList, \@splitIgnoreListLine, $fhLogFile);
     }
     close $fhReadIgnoreList;
+    say $fhLogFile "There are " . scalar(%ignoreList) . " programmes in the ignore list.";
     say $fhLogFile '';
 }
 
@@ -355,12 +369,13 @@ if(-f $claIgnoreListFilePath) {
 say $fhLogFile "Checking which already downloaded programmes are available for download in 1080p quality now...";
 say "Checking which already downloaded programmes are available for download in 1080p quality now...";
 say "Detailed progress can be monitored in a separate window with the command `tail -f $claLogFilePath`";
-say "Please be patient, this may take some time...";
+say "Please be patient, this may take a (very) long time...";
+# TODO: Implement Storable module to save progress with each iteration and reload on future runs?
 foreach my $pid (keys %availableProgrammes) {
     # Check PID against ignore.list programmes...
     if(exists $ignoreList{$pid}) {
         # This PID is present in the ignore.list file
-        say $fhLogFile "Programme with PID $pid; \"$availableProgrammes{$pid}{'name'}, $availableProgrammes{$pid}{'episode'}\" is in the ignore list; skipping...";
+        say $fhLogFile "Programme with PID $pid; \"$availableProgrammes{$pid}{'name'}, $availableProgrammes{$pid}{'episode'}\" is in the ignore list, skipping...";
         say $fhLogFile '';
         next;
     }
@@ -374,7 +389,7 @@ foreach my $pid (keys %availableProgrammes) {
     my $availableInFhd = 0;
     my $downloadSize = 0;
 
-    say $fhLogFile "";
+    # say $fhLogFile "";
     say $fhLogFile "Querying get_iplayer for information about available programme with PID $pid; \"$availableProgrammes{$pid}{'name'}, $availableProgrammes{$pid}{'episode'}\"...";
     # Get programme info, repeating a maximum of $infoMaxAttempts in case of failure
     while($infoExitCode != 0 && $infoAttempts < $infoMaxAttempts) {
@@ -386,9 +401,9 @@ foreach my $pid (keys %availableProgrammes) {
         # TODO: Do I need it as a subroutine, as this is primarily where I'm interacting with get_iplayer in a way that involves communication with the BBC iPlayer infrastructure
         #       Future use of get_iplayer should be limited to get_iplayer --pvr-queue commands as I don't think I'll be using get_iplayer --get from within this program.
         if($totalGetIplayerErrors > $maximumPermissableGetIplayerErrors) {
-            say $fhLogFile "ERROR: Exiting due to more than $maximumPermissableGetIplayerErrors errors while attempting to run $claExecutablePath --info --pid=[PID] commands";
+            say $fhLogFile "ERROR: Exiting due to more than $maximumPermissableGetIplayerErrors errors while attempting to run $claExecutablePath --info --pid=[PID] commands.";
             say $fhLogFile '';
-            say "ERROR: Exiting due to more than $maximumPermissableGetIplayerErrors errors while attempting to run $claExecutablePath --info --pid=[PID] commands";
+            say "ERROR: Exiting due to more than $maximumPermissableGetIplayerErrors errors while attempting to run $claExecutablePath --info --pid=[PID] commands.";
             say "       See log for further details: $claLogFilePath";
         }
     }
@@ -416,9 +431,10 @@ foreach my $pid (keys %availableProgrammes) {
         # Report error, failed to get programme info in $infoMaxAttempts attempts
         say $fhLogFile "Failed $infoMaxAttempts times to get programme information for TV programme $pid; \"$availableProgrammes{$pid}{'name'}, $availableProgrammes{$pid}{'episode'}\"";
     }
+    say $fhLogFile '';
 }
 
-say $fhLogFile '';
+# say $fhLogFile '';
 say $fhLogFile "There are " . scalar(%availableInFhd) . " programmes available for re-download in 1080p quality.";
 say $fhLogFile '';
 
@@ -427,18 +443,144 @@ say $fhLogFile '';
 
 # Create/open the ignore.list file for appending
 my $fhAppendIgnoreList;
-open($fhAppendIgnoreList, '>>encoding:UTF-8', $claIgnoreListFilePath);
+open($fhAppendIgnoreList, '>>encoding(UTF-8)', $claIgnoreListFilePath);
 
-# Offer user a 
+# Offer user a cloice of whether to download the programme or not
+# Choices (yes, no, ignore, quit)
+# download_history file format for reference:
+# pid|name|episode|type|download_end_time|mode|filename|version|duration|desc|channel|categories|thumbnail|guidance|web|episodenum|seriesnum|
 foreach my $fhdPid (keys %availableInFhd) {
-    say "foo";
+    say '';
+    say "Programme PID $fhdPid \"$availableInFhd{$fhdPid}{'name'}, $availableInFhd{$fhdPid}{'episode'}\" is available in 1080p quality.";
+    say "The total download size of programmes already added to get_iplayer's pvr-queue in this session is estimated to be " . prettyFileSize($cumulativeDownloadSize) . '.';
+    say "The download size of this programme is estimated to be " . prettyFileSize($availableInFhd{$fhdPid}{'download_size'}) . '.';
+    say "Would you like to add it to the download queue?";
+    say "[y]es    - add it to the download queue.";
+    say "[n]o     - do not download it this time (DEFAULT).";
+    say "[i]gnore - add it to the ignore list.";
+    say "[q]uit   - quit the program now.";
+    say "Choose one of the options above [y/n/i/q] (default: n):";
+    my $defaultInput = 'n';
+    my $userInput;
+    say $fhLogFile "Asking the user what to do with programme PID $fhdPid \"$availableInFhd{$fhdPid}{'name'}, $availableInFhd{$fhdPid}{'episode'}\"...";
+    while (1) {
+        $userInput = readline(STDIN);
+        chomp $userInput;
+        if (length($userInput) == 0) {
+            # Terminal output
+            say "Blank user input, selecting default option \'$defaultInput\'";
+            # Log file output
+            say $fhLogFile "Blank user input, selecting default option \'$defaultInput\'";
+            $userInput = $defaultInput;
+        }
+        if ($userInput =~ /^[yniq]$/i) {
+            # No `say` here, it is dealt with in each of the individual valid input clauses below
+            last;
+        }
+        else {
+            # Terminal output
+            say "Invalid input: Choose one of the options [y/n/i/q] (n):";
+            # Log file output
+            say $fhLogFile "Invalid user input, reprompting...";
+        }
+    }
+
+    # Yes: Programme to be downloaded
+    if ($userInput =~ /^y$/i) {
+        my $pvrQueueCommand = "$claExecutablePath --pvr-queue --tv-quality=fhd --force --pid=$fhdPid";
+        my $pvrQueueCommandOutput= `$pvrQueueCommand`;
+        my $pvrQueueCommandExitCode = $? >> 8;
+        if ($pvrQueueCommandExitCode == 0) {
+            $cumulativeDownloadSize += $availableInFhd{$fhdPid}{'download_size'};
+            $numProgrammesAddedToPvr++;
+            # Terminal output
+            say "Added programme PID $fhdPid \"$availableInFhd{$fhdPid}{'name'}, $availableInFhd{$fhdPid}{'episode'}\" to get_iplayer's PVR queue.";
+            # Log file output
+            say $fhLogFile "Added programme PID $fhdPid \"$availableInFhd{$fhdPid}{'name'}, $availableInFhd{$fhdPid}{'episode'}\" to get_iplayer's PVR queue.";
+            say $fhLogFile "Command used: $pvrQueueCommand";
+        }
+        else {
+            # Error adding to get_iplayer's pvr
+            # Terminal output
+            say "Failed to add programme PID $fhdPid \"$availableInFhd{$fhdPid}{'name'}, $availableInFhd{$fhdPid}{'episode'}\" to get_iplayer's PVR queue.";
+            say "See the log file $claLogFilePath for more information.";
+            # Log file output
+            say $fhLogFile "Failed to add programme PID $fhdPid \"$availableInFhd{$fhdPid}{'name'}, $availableInFhd{$fhdPid}{'episode'}\" to get_iplayer's PVR queue.";
+            say $fhLogFile "Command used: $pvrQueueCommand";
+            say $fhLogFile "Command exit code: $pvrQueueCommandExitCode";
+            say $fhLogFile "Command output:";
+            say $fhLogFile "$pvrQueueCommandOutput"
+        }
+    }
+
+    # No: Programme not to be downloaded in this session
+    if ($userInput =~ /^n$/i) {
+        # Terminal output
+        say "Not downloading programme PID $fhdPid \"$availableInFhd{$fhdPid}{'name'}, $availableInFhd{$fhdPid}{'episode'}\" this time.";
+        # Log file output
+        say $fhLogFile "Not downloading programme PID $fhdPid \"$availableInFhd{$fhdPid}{'name'}, $availableInFhd{$fhdPid}{'episode'}\" this time.";
+    }
+    
+    # Ignore: Programme to be ignored. Write its details to the ignore.list file using the download_history file format.
+    if ($userInput =~ /^i$/i) {
+        my $newIgnoreListLine = "$fhdPid|$alreadyDownloadedStanDef{$fhdPid}{'name'}|$alreadyDownloadedStanDef{$fhdPid}{'episode'}|";
+        $newIgnoreListLine .= "$alreadyDownloadedStanDef{$fhdPid}{'type'}|$alreadyDownloadedStanDef{$fhdPid}{'download_end_time'}|";
+        $newIgnoreListLine .= "$alreadyDownloadedStanDef{$fhdPid}{'mode'}|$alreadyDownloadedStanDef{$fhdPid}{'filename'}|";
+        $newIgnoreListLine .= "$alreadyDownloadedStanDef{$fhdPid}{'version'}|$alreadyDownloadedStanDef{$fhdPid}{'duration'}|";
+        $newIgnoreListLine .= "$alreadyDownloadedStanDef{$fhdPid}{'desc'}|$alreadyDownloadedStanDef{$fhdPid}{'channel'}|";
+        $newIgnoreListLine .= "$alreadyDownloadedStanDef{$fhdPid}{'categories'}|$alreadyDownloadedStanDef{$fhdPid}{'thumbnail'}|";
+        $newIgnoreListLine .= "$alreadyDownloadedStanDef{$fhdPid}{'guidance'}|$alreadyDownloadedStanDef{$fhdPid}{'web'}|";
+        $newIgnoreListLine .= "$alreadyDownloadedStanDef{$fhdPid}{'episodenum'}|$alreadyDownloadedStanDef{$fhdPid}{'seriesnum'}|";
+
+        # Add the programme to the ignore list
+        say $fhAppendIgnoreList "$newIgnoreListLine";
+
+        # Terminal output
+        say "Added programme PID $fhdPid \"$availableInFhd{$fhdPid}{'name'}, $availableInFhd{$fhdPid}{'episode'}\" to the ignore list.";
+        # Log file output
+        say $fhLogFile "Added programme PID $fhdPid \"$availableInFhd{$fhdPid}{'name'}, $availableInFhd{$fhdPid}{'episode'}\" to the ignore list file $claIgnoreListFilePath";
+    }
+
+    # Quit: Cleanly exit the program without processing any more programmes.
+    if ($userInput =~ /^q$/i) {
+        # Terminal output
+        say "Not processing any more programmes...";
+        # Log file output
+        say $fhLogFile "User requested to quit before processing all availalbe programmes...";
+        last;
+    }
+    say '';
+    say $fhLogFile '';
+    # Don't place anything else here at the bottom of the loop
 }
-
 close $fhAppendIgnoreList;
+say $fhLogFile '';
 
-# Then offer the choices, add to pvr-queue
-
-# Offer to run get_iplayer --pvr now
-
-# close $fhTvCache;
-close $fhLogFile;
+# Offer to run get_iplayer --pvr now (TODO: check command is correct!)?
+if ($numProgrammesAddedToPvr > 0) {
+    my $pvrRunCommand = "$claExecutablePath --pvr";
+    my $userInput;
+    say "$numProgrammesAddedToPvr programmes have been added to get_pilayer's PVR. Would you like to launch the PVR automatically as this script exits ([y]es/[n]o)?";
+    while(1) {
+        $userInput = readline(STDIN);
+        chomp $userInput;
+        if($userInput =~ /^[yn]$/i) {
+            last;
+        }
+        else {
+            # Terminal output
+            say "Invalid input: Choose either [y]es or [n]o:";
+            # Log file output
+            say $fhLogFile "Asking user whether to run $pvrRunCommand but received invalid user input \'$userInput\', reprompting...";
+        }
+    }
+    if($userInput =~ /^y$/i) {
+        say $fhLogFile "Running $pvrRunCommand and exiting...";
+        say $fhLogFile '';
+        close $fhLogFile;
+        system("exec $pvrRunCommand");        
+    }
+    else {
+        close $fhLogFile;
+    }
+}
