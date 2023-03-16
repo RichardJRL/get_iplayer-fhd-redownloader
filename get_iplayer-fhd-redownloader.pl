@@ -295,6 +295,12 @@ foreach my $pid (keys %alreadyDownloadedBothDef) {
 say $fhLogFile "Number of programmes in the standard quality downloads array after duplicate removal is " . scalar(%alreadyDownloadedStanDef);
 say $fhLogFile '';
 
+# Refresh get_iplayer's tv.cache file
+# TODO: Inspect exit code of refresh command, log, informational output to STDOUT too
+my $cacheRefreshCommand = "$claExecutablePath --refresh";
+say $fhLogFile "Refreshing get_iplayer's tv.cache file using the command $cacheRefreshCommand";
+say $fhLogFile '';
+`$cacheRefreshCommand`;
 # Parse get_iplayer's tv.cache file
 # tv.cache file format for reference
 #index|type|name|episode|seriesnum|episodenum|pid|channel|available|expires|duration|desc|web|thumbnail|timeadded|
@@ -371,12 +377,20 @@ say "Checking which already downloaded programmes are available for download in 
 say "Detailed progress can be monitored in a separate window with the command `tail -f $claLogFilePath`";
 say "Please be patient, this may take a (very) long time...";
 # TODO: Implement Storable module to save progress with each iteration and reload on future runs?
+my $numAvailableProgrammes = scalar(%availableProgrammes);
+my $currentProgrammeNumber = 0;
 foreach my $pid (keys %availableProgrammes) {
+    $currentProgrammeNumber++;
+    my $progressIndicator = $currentProgrammeNumber . '/' . $numAvailableProgrammes . ':';
     # Check PID against ignore.list programmes...
     if(exists $ignoreList{$pid}) {
         # This PID is present in the ignore.list file
-        say $fhLogFile "Programme with PID $pid; \"$availableProgrammes{$pid}{'name'}, $availableProgrammes{$pid}{'episode'}\" is in the ignore list, skipping...";
+        # Terminal output
+        say "$progressIndicator Programme with PID $pid; \"$availableProgrammes{$pid}{'name'}, $availableProgrammes{$pid}{'episode'}\" is in the ignore list, skipping...";
+        # Log file output
+        say $fhLogFile "$progressIndicator Programme with PID $pid; \"$availableProgrammes{$pid}{'name'}, $availableProgrammes{$pid}{'episode'}\" is in the ignore list, skipping...";
         say $fhLogFile '';
+
         next;
     }
 
@@ -389,8 +403,10 @@ foreach my $pid (keys %availableProgrammes) {
     my $availableInFhd = 0;
     my $downloadSize = 0;
 
-    # say $fhLogFile "";
-    say $fhLogFile "Querying get_iplayer for information about available programme with PID $pid; \"$availableProgrammes{$pid}{'name'}, $availableProgrammes{$pid}{'episode'}\"...";
+    # Terminal output
+    say "$progressIndicator Querying get_iplayer for information about available programme with PID $pid; \"$availableProgrammes{$pid}{'name'}, $availableProgrammes{$pid}{'episode'}\"...";
+    # Log file output
+    say $fhLogFile "$progressIndicator Querying get_iplayer for information about available programme with PID $pid; \"$availableProgrammes{$pid}{'name'}, $availableProgrammes{$pid}{'episode'}\"...";
     # Get programme info, repeating a maximum of $infoMaxAttempts in case of failure
     while($infoExitCode != 0 && $infoAttempts < $infoMaxAttempts) {
         $infoOutput = `$infoCommand`;
@@ -401,9 +417,9 @@ foreach my $pid (keys %availableProgrammes) {
         # TODO: Do I need it as a subroutine, as this is primarily where I'm interacting with get_iplayer in a way that involves communication with the BBC iPlayer infrastructure
         #       Future use of get_iplayer should be limited to get_iplayer --pvr-queue commands as I don't think I'll be using get_iplayer --get from within this program.
         if($totalGetIplayerErrors > $maximumPermissableGetIplayerErrors) {
-            say $fhLogFile "ERROR: Exiting due to more than $maximumPermissableGetIplayerErrors errors while attempting to run $claExecutablePath --info --pid=[PID] commands.";
+            say $fhLogFile "$progressIndicator ERROR: Exiting due to more than $maximumPermissableGetIplayerErrors errors while attempting to run $claExecutablePath --info --pid=[PID] commands.";
             say $fhLogFile '';
-            say "ERROR: Exiting due to more than $maximumPermissableGetIplayerErrors errors while attempting to run $claExecutablePath --info --pid=[PID] commands.";
+            say "$progressIndicator ERROR: Exiting due to more than $maximumPermissableGetIplayerErrors errors while attempting to run $claExecutablePath --info --pid=[PID] commands.";
             say "       See log for further details: $claLogFilePath";
         }
     }
@@ -415,7 +431,7 @@ foreach my $pid (keys %availableProgrammes) {
         if($infoOutput =~ /qualities:.*:.*fhd/) {
             $availableInFhd = 1;
             $availableInFhd{$pid} = $availableProgrammes{$pid};
-            say $fhLogFile "1080p quality version available for programme with PID $pid; \"$availableProgrammes{$pid}{'name'}, $availableProgrammes{$pid}{'episode'}\".";
+            say $fhLogFile "$progressIndicator 1080p quality version available for programme with PID $pid; \"$availableProgrammes{$pid}{'name'}, $availableProgrammes{$pid}{'episode'}\".";
 
             # search for `qualitysizes: ... fhd=`
             if($infoOutput =~ /qualitysizes:.*:.*fhd=([0-9]+)MB/) {
@@ -429,7 +445,10 @@ foreach my $pid (keys %availableProgrammes) {
     }
     else {
         # Report error, failed to get programme info in $infoMaxAttempts attempts
-        say $fhLogFile "Failed $infoMaxAttempts times to get programme information for TV programme $pid; \"$availableProgrammes{$pid}{'name'}, $availableProgrammes{$pid}{'episode'}\"";
+        # Terminal output
+        say "$progressIndicator Failed $infoMaxAttempts times to get programme information for TV programme $pid; \"$availableProgrammes{$pid}{'name'}, $availableProgrammes{$pid}{'episode'}\"";
+        # Log file output
+        say $fhLogFile "$progressIndicator Failed $infoMaxAttempts times to get programme information for TV programme $pid; \"$availableProgrammes{$pid}{'name'}, $availableProgrammes{$pid}{'episode'}\"";
     }
     say $fhLogFile '';
 }
@@ -584,3 +603,6 @@ if ($numProgrammesAddedToPvr > 0) {
         close $fhLogFile;
     }
 }
+
+# TODO: In the terminal give a visual indication that the --info gathering is continuing.
+# TODO: Sort the availableProgrammes and/or availableInFhd array by the expires field
