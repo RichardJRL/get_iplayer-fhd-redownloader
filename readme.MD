@@ -1,7 +1,7 @@
 # get_iplayer-fhd-redownloader Description
 
 ## Summary
-A program to parse a `get_iplayer` download_history file and re-download previously downloaded programmes that are currently available in the new FullHD 1080p quality option offered by the BBC.
+A program to parse a [`get_iplayer`](https://github.com/get-iplayer/get_iplayer) download_history file and re-download previously downloaded programmes that are currently available in the new FullHD 1080p quality option offered by the BBC.
 
 It offers the user an interactive choice for what to do for each programme found available in the new FullHD 1080p quality:
 1. Download it
@@ -12,7 +12,7 @@ It offers the user an interactive choice for what to do for each programme found
 **NB:** `get_iplayer` must be installed on the system that this program is run on. This program relies on it being properly configured and will respect currently defined preferences such as download directories, metadata downloading etc. which are saved in the user's `~/.get_iplayer/options` file.
 ## Usage
 ### Command Line Arguments & Files Used
-The program will run without any of the command line arguments being specified - and will only alert the user to provide the locations of essential files if it can't find them in their default locations.
+The program will run without any command line arguments being specified - and will only alert the user to provide the locations of essential files as command line arguments if it can't find them in their default locations.
 
 It requires read-only access to two `get_iplayer` created files:
 - `~/.get_iplayer/download_history`
@@ -53,7 +53,7 @@ This is a Perl script to parse a `~/.get_iplayer/download_history` file and extr
 
 **Aside:** `cat ~/.get_iplayer/download_history | awk -F '|' '{print $6}' | grep fhd | sort | uniq` will summarise the range of `fhd` quality descriptors, for both 720p and 1080p, that are already in the `download_history` file.
 
-The Perl script will then take the list of TV programme PIDs that have not been downloaded in 1080p and search the `~/.get_iplayer/tv.cache` file to see if any are currently available on iPlayer.
+The Perl script will then take the list of TV programme PIDs that have not been downloaded in 1080p and search the `~/.get_iplayer/tv.cache` file to see if any of them are currently available on iPlayer.
 
 After assembling a list of those TV programmes not already downloaded which are currently available on iPlayer, it will run the command `get_iplayer --info --pid=[PID]` to discover if they are now available in the new `fhd` 1080p resolution. This may take a *very, very* long time.
 
@@ -63,6 +63,8 @@ After assembling a list of those TV programmes not already downloaded which are 
 `qualities:       original: fhd,hd,sd,web,mobile`
 
 If currently available programmes are available in `fhd`, it will queue them for download with the command `get_iplayer --pvr-queue --tv-quality=fhd --force --pid=[PID]`. Explicitly setting `--tv-quality=fhd` ensures that only the `fhd` version will be downloaded, and no bandwidth will be wasted on re-downloading any lower-quality version.
+
+**Aside:** To instruct `get_iplayer` to try to obtain future programmes in FullHD 1080p quality whenever possible (not all programmes have a 1080p version), run the command: `get_iplayer --prefs-add --tv-quality="fhd,hd,sd,web"` and `get_iplayer` will first try to obtain the highest-quality version available, falling back to progressively lower quality versions in event of failure.
 
 After asking the user for what to do with each available programme, the program will offer to run the `get_iplayer --pvr` command as it exits. However, it may be better to schedule this as a background cronjob, rather than running immediately. Or to ensure that a utility such as `screen` or `tmux` is used to guard against disruption to what may be a very large and lengthy download.
 # References:
@@ -98,15 +100,9 @@ Known problematic PIDs:
 - m000trt5 (Gaelic English language separated by newline in `desc`)
 - p0dnvdrc (Multiple hidden newlines in `desc`)
 
-These are the only problematic PIDs in 11000 line `download_history` file that spans the period from September 2012 to March 2023.
+These are the only problematic TV programme PIDs discovered in an 11000 line `download_history` file that spans the period from September 2012 to March 2023.
 
 **Workaround:**
-*Thoughts:*
-- Check for NOT 17 elements in the line... Adjust based on type `tv|radio` to account for dual-language `name`.
-- Check for `/^[a-zA-Z0-9]{8}\|/` to match PID & field separator at the beginning of the line. This will catch the newline in description. Could combine with previous line saved as a previous array?
-- Skip completely blank lines.
-- Can further anchor elements in the regexp based on 10 digit `download_end_time` and a multi-digit `duration`.
-*Actual:*
 - Ignore zero-length lines
 - Only parse 17 element lines
 - Write non-conforming lines to a log file and forget about them in the program flow thereafter. Users will have to sort these out manually.
