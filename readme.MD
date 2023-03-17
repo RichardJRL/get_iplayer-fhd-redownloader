@@ -19,6 +19,7 @@ The program will run without any command line arguments being specified - and wi
 It requires read-only access to two `get_iplayer` created files:
 - `~/.get_iplayer/download_history`
 - `~/.get_iplayer/tv.cache`
+  
 It writes to two new files in a new subdirectory of the user's hidden `~/.get_iplayer` directory:
 - `~/.get_iplayer/fhd-redownloader/ignore.list`
 - `~/.get_iplayer/fhd-redownloader/activity.log`
