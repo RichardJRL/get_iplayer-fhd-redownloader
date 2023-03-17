@@ -32,22 +32,22 @@ my $cumulativeDownloadSize = 0;
 my $numProgrammesAddedToPvr = 0;
 # Variables to hold comand line arguments, and their defaults if not deliberately set
 # System defaults
-# my $claExecutablePath = '/usr/bin/get_iplayer';
-# my $claDataDir = '~/.get_iplayer/';
-# my $claDownloadHistoryFilePath = $claDataDir . 'download_history';
-# my $claTVCacheFilePath = $claDataDir . 'tv.cache';
-# my $claRedownloaderDir = $claDataDir . '/fhd-redownloader/';
-# my $claLogFilePath = $claDataDir . $claRedownloaderDir . 'activity.log';
-# my $claIgnoreListFilePath = $claDataDir . $claRedownloaderDir . 'ignore.list';
+my $claExecutablePath = '/usr/bin/get_iplayer';
+my $claDataDir = '~/.get_iplayer/';
+my $claDownloadHistoryFilePath = $claDataDir . 'download_history';
+my $claTVCacheFilePath = $claDataDir . 'tv.cache';
+my $claRedownloaderDir = $claDataDir . '/fhd-redownloader/';
+my $claLogFilePath = $claDataDir . $claRedownloaderDir . 'activity.log';
+my $claIgnoreListFilePath = $claDataDir . $claRedownloaderDir . 'ignore.list';
 #
 # Testing overrides
-my $claExecutablePath = '/usr/bin/get_iplayer';
-my $claDataDir = './get_iplayer_test_files';
-my $claDownloadHistoryFilePath = $claDataDir . '/download_history_shortened';
-my $claTVCacheFilePath = $claDataDir . '/tv.cache';
-my $claRedownloaderDir = $claDataDir . '/fhd-redownloader/';
-my $claLogFilePath = $claRedownloaderDir . 'activity.log';
-my $claIgnoreListFilePath = $claRedownloaderDir . 'ignore.list';
+# my $claExecutablePath = '/usr/bin/get_iplayer';
+# my $claDataDir = './get_iplayer_test_files';
+# my $claDownloadHistoryFilePath = $claDataDir . '/download_history_shortened';
+# my $claTVCacheFilePath = $claDataDir . '/tv.cache';
+# my $claRedownloaderDir = $claDataDir . '/fhd-redownloader/';
+# my $claLogFilePath = $claRedownloaderDir . 'activity.log';
+# my $claIgnoreListFilePath = $claRedownloaderDir . 'ignore.list';
 
 
 ################################################################################
