@@ -1,7 +1,7 @@
 # get_iplayer-fhd-redownloader Description
 
 ## Summary
-A program that parse a [`get_iplayer`](https://github.com/get-iplayer/get_iplayer) download_history file offers to re-download previously downloaded programmes that are currently available in the new FullHD 1080p quality option offered by the BBC.
+A program that parses a [`get_iplayer`](https://github.com/get-iplayer/get_iplayer) download_history file and offers to re-download previously downloaded programmes that are currently available in the newer FullHD 1080p quality option offered by the BBC. The option for FullHD downloads became available in `get_iplayer` circa February 2022.
 
 It offers the user an interactive choice for what to do for each programme found available in the new FullHD 1080p quality:
 1. Download it
@@ -9,7 +9,7 @@ It offers the user an interactive choice for what to do for each programme found
 3. Ignore it (remember not to ask the user about it again on subsequent runs)
 4. Stop processing programmes and quit.
 
-The programmes offered for download are sorted by soonest-expiring first, so even if the user quits before reviewing the entire list, the most urgent programmes have always been presented to them. 
+The programmes offered for download are sorted soonest-expiring first, so even if the user quits before reviewing the entire list, the most urgent programmes have always been presented to them. 
 
 **NB:** `get_iplayer` must be installed on the system that this program is run on. This program relies on it being properly configured and will respect currently defined preferences such as download directories, metadata downloading etc. which are saved in the user's `~/.get_iplayer/options` file.
 ## Usage
@@ -112,5 +112,6 @@ These are the only problematic TV programme PIDs discovered in an 11000 line `do
 - get_iplayer [GitHub](https://github.com/get-iplayer/get_iplayer)
 - get_iplayer [Wiki](https://github.com/get-iplayer/get_iplayer/wiki)
 - get_iplayer [recording quality information](https://github.com/get-iplayer/get_iplayer/wiki/modes)
+- get_iplayer [fhd quality commit](https://github.com/get-iplayer/get_iplayer/commit/e89c643cf7667849e98ff25643664b20e5f16dfa)
 - BBC Programme Identifiers [(PIDs)](https://en.wikipedia.org/wiki/BBC_Programme_Identifier)
   
