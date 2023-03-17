@@ -5,6 +5,7 @@ use warnings;
 use autodie;
 use Data::Dumper;
 use File::Path;
+use File::HomeDir;
 use Getopt::Long;
 use Time::Piece;
 use Time::Seconds;
@@ -30,25 +31,26 @@ my $totalGetIplayerErrors = 0;
 my $maximumPermissableGetIplayerErrors = 50;
 my $cumulativeDownloadSize = 0;
 my $numProgrammesAddedToPvr = 0;
+
 # Variables to hold comand line arguments, and their defaults if not deliberately set
 # System defaults
-my $claExecutablePath = '/usr/bin/get_iplayer';
-my $claDataDir = '~/.get_iplayer/';
-my $claDownloadHistoryFilePath = $claDataDir . 'download_history';
-my $claTVCacheFilePath = $claDataDir . 'tv.cache';
-my $claRedownloaderDir = $claDataDir . '/fhd-redownloader/';
-my $claLogFilePath = $claDataDir . $claRedownloaderDir . 'activity.log';
-my $claIgnoreListFilePath = $claDataDir . $claRedownloaderDir . 'ignore.list';
-#
+my $claExecutablePath = '/usr/local/bin/get_iplayer';
+my $claDataDir = File::HomeDir->my_home() . '/.get_iplayer/';
+my $claDownloadHistoryFilePath = "$claDataDir" . 'download_history';
+my $claTVCacheFilePath = "$claDataDir" . 'tv.cache';
+my $claRedownloaderDir = "$claDataDir" . 'fhd-redownloader/';
+my $claLogFilePath = "$claRedownloaderDir" . 'activity.log';
+my $claIgnoreListFilePath = "$claRedownloaderDir" . 'ignore.list';
+
+# Variables to hold comand line arguments, and their defaults if not deliberately set
 # Testing overrides
-# my $claExecutablePath = '/usr/bin/get_iplayer';
+# my $claExecutablePath = '/usr/local/bin/get_iplayer';
 # my $claDataDir = './get_iplayer_test_files';
 # my $claDownloadHistoryFilePath = $claDataDir . '/download_history_shortened';
 # my $claTVCacheFilePath = $claDataDir . '/tv.cache';
 # my $claRedownloaderDir = $claDataDir . '/fhd-redownloader/';
 # my $claLogFilePath = $claRedownloaderDir . 'activity.log';
 # my $claIgnoreListFilePath = $claRedownloaderDir . 'ignore.list';
-
 
 ################################################################################
 # Subroutines
@@ -127,11 +129,11 @@ sub prettyFileSize {
 ################################################################################
 
 # Parse command line arguments
-GetOptions('get_iplayer-executable-path=s' => \$claExecutablePath);
-GetOptions('download-history=s' => \$claDownloadHistoryFilePath);
-GetOptions('tv-cache=s' => \$claTVCacheFilePath);
-GetOptions('log-file=s' => \$claLogFilePath);
-GetOptions('ignore-list=s' => \$claIgnoreListFilePath);
+GetOptions('get_iplayer-executable-path=s' => \$claExecutablePath,
+            'download-history=s' => \$claDownloadHistoryFilePath,
+            'tv-cache=s' => \$claTVCacheFilePath,
+            'log-file=s' => \$claLogFilePath,
+            'ignore-list=s' => \$claIgnoreListFilePath);
 
 # Check the validity of the various required paths:
 my $pathErrorCounter = 0;
@@ -148,7 +150,7 @@ say $fhTempLogFile "get_iplayer data directory: $claDataDir";
 say $fhTempLogFile "get_iplayer download history file path: $claDownloadHistoryFilePath";
 say $fhTempLogFile "get_iplayer TV cache file path: $claTVCacheFilePath";
 say $fhTempLogFile "fhd-redownloader directory: $claRedownloaderDir";
-say $fhTempLogFile "fhd-redownloader log file path: $claTVCacheFilePath";
+say $fhTempLogFile "fhd-redownloader log file path: $claLogFilePath";
 say $fhTempLogFile "fhd-redownloader ignore list file path: $claIgnoreListFilePath";
 say $fhTempLogFile '';
 
