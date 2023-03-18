@@ -631,7 +631,7 @@ say $fhLogFile '';
 if ($numProgrammesAddedToPvr > 0) {
     my $pvrRunCommand = "$claExecutablePath --pvr";
     my $userInput;
-    say "$numProgrammesAddedToPvr programmes have been added to get_pilayer's PVR. Would you like to launch the PVR automatically as this script exits ([y]es/[n]o)?";
+    say "$numProgrammesAddedToPvr programmes have been added to get_iplayer's PVR. Would you like to launch the PVR automatically as this script exits ([y]es/[n]o)?";
     while(1) {
         $userInput = readline(STDIN);
         chomp $userInput;
