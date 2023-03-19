@@ -402,6 +402,25 @@ if(-f $claIgnoreListFilePath) {
     say $fhLogFile '';
 }
 
+# Remove programmes on the ignore list from the availableProgrammes hash
+foreach my $pid (keys %availableProgrammes) {
+    # Check PID against ignore.list programmes...
+    if(exists $ignoreList{$pid}) {
+        # This PID is present in the ignore.list file
+        delete %availableProgrammes{$pid};
+        # Terminal output
+        say "Programme with PID $pid; \"$availableProgrammes{$pid}{'name'}, $availableProgrammes{$pid}{'episode'}\" is in the ignore list, removing it from the list of available programmes...";
+        # Log file output
+        say $fhLogFile "Programme with PID $pid; \"$availableProgrammes{$pid}{'name'}, $availableProgrammes{$pid}{'episode'}\" is in the ignore list, removing it from the list of available programmes...";
+        say $fhLogFile '';
+    }
+}
+# Terminal output
+say "Number of already downloaded TV programmes which are available now after checking against the ignore list is " . scalar(%availableProgrammes);
+# Log file output
+say $fhLogFile "Number of already downloaded TV programmes which are available now after checking against the ignore list is " . scalar(%availableProgrammes);
+say $fhLogFile '';
+
 # # use `get_iplayer --info --pid=[PID] to check which available programmes are available in fhd quality`
 say $fhLogFile "Checking which already downloaded programmes are available for download in 1080p quality now...";
 say "Checking which already downloaded programmes are available for download in 1080p quality now...";
@@ -413,16 +432,16 @@ foreach my $pid (keys %availableProgrammes) {
     $currentProgrammeNumber++;
     my $progressIndicator = $currentProgrammeNumber . '/' . $numAvailableProgrammes . ':';
     # Check PID against ignore.list programmes...
-    if(exists $ignoreList{$pid}) {
-        # This PID is present in the ignore.list file
-        # Terminal output
-        say "$progressIndicator Programme with PID $pid; \"$availableProgrammes{$pid}{'name'}, $availableProgrammes{$pid}{'episode'}\" is in the ignore list, skipping...";
-        # Log file output
-        say $fhLogFile "$progressIndicator Programme with PID $pid; \"$availableProgrammes{$pid}{'name'}, $availableProgrammes{$pid}{'episode'}\" is in the ignore list, skipping...";
-        say $fhLogFile '';
-
-        next;
-    }
+    # if(exists $ignoreList{$pid}) {
+    #     # This PID is present in the ignore.list file
+    #     # Terminal output
+    #     say "$progressIndicator Programme with PID $pid; \"$availableProgrammes{$pid}{'name'}, $availableProgrammes{$pid}{'episode'}\" is in the ignore list, skipping...";
+    #     # Log file output
+    #     say $fhLogFile "$progressIndicator Programme with PID $pid; \"$availableProgrammes{$pid}{'name'}, $availableProgrammes{$pid}{'episode'}\" is in the ignore list, skipping...";
+    #     say $fhLogFile '';
+    # 
+    #     next;
+    # }
 
     # get programme info
     my $infoCommand = "$claExecutablePath --info --pid=$pid";
@@ -443,14 +462,12 @@ foreach my $pid (keys %availableProgrammes) {
         $infoExitCode = $? >> 8;
         $infoAttempts++;
         $totalGetIplayerErrors++;
-        # TODO: Insert subroutine here that compares totalGetIplayerErrors with maximumPermissableGetIplayerErrors and exit if greater.
-        # TODO: Do I need it as a subroutine, as this is primarily where I'm interacting with get_iplayer in a way that involves communication with the BBC iPlayer infrastructure
-        #       Future use of get_iplayer should be limited to get_iplayer --pvr-queue commands as I don't think I'll be using get_iplayer --get from within this program.
         if($totalGetIplayerErrors > $maximumPermissableGetIplayerErrors) {
             say $fhLogFile "$progressIndicator ERROR: Exiting due to more than $maximumPermissableGetIplayerErrors errors while attempting to run $claExecutablePath --info --pid=[PID] commands.";
             say $fhLogFile '';
             say "$progressIndicator ERROR: Exiting due to more than $maximumPermissableGetIplayerErrors errors while attempting to run $claExecutablePath --info --pid=[PID] commands.";
             say "       See log for further details: $claLogFilePath";
+            last;
         }
     }
     # say "get_iplayer --info exit code: $infoExitCode";
