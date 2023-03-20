@@ -407,12 +407,12 @@ foreach my $pid (keys %availableProgrammes) {
     # Check PID against ignore.list programmes...
     if(exists $ignoreList{$pid}) {
         # This PID is present in the ignore.list file
-        delete %availableProgrammes{$pid};
         # Terminal output
         say "Programme with PID $pid; \"$availableProgrammes{$pid}{'name'}, $availableProgrammes{$pid}{'episode'}\" is in the ignore list, removing it from the list of available programmes...";
         # Log file output
         say $fhLogFile "Programme with PID $pid; \"$availableProgrammes{$pid}{'name'}, $availableProgrammes{$pid}{'episode'}\" is in the ignore list, removing it from the list of available programmes...";
         say $fhLogFile '';
+        delete %availableProgrammes{$pid};
     }
 }
 # Terminal output
