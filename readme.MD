@@ -115,4 +115,5 @@ These are the only problematic TV programme PIDs discovered in an 11000 line `do
 - get_iplayer [recording quality information](https://github.com/get-iplayer/get_iplayer/wiki/modes)
 - get_iplayer [fhd quality commit](https://github.com/get-iplayer/get_iplayer/commit/e89c643cf7667849e98ff25643664b20e5f16dfa)
 - BBC Programme Identifiers [(PIDs)](https://en.wikipedia.org/wiki/BBC_Programme_Identifier)
-  
+## Support this Project
+<a href='https://ko-fi.com/richardjrl' target='_blank'><img height='35' style='border:0px;height:46px;' src='https://az743702.vo.msecnd.net/cdn/kofi3.png?v=0' border='0' alt='Buy Me a Coffee at ko-fi.com' />
