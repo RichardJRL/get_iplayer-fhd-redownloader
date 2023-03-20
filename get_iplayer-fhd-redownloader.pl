@@ -431,17 +431,6 @@ my $currentProgrammeNumber = 0;
 foreach my $pid (keys %availableProgrammes) {
     $currentProgrammeNumber++;
     my $progressIndicator = $currentProgrammeNumber . '/' . $numAvailableProgrammes . ':';
-    # Check PID against ignore.list programmes...
-    # if(exists $ignoreList{$pid}) {
-    #     # This PID is present in the ignore.list file
-    #     # Terminal output
-    #     say "$progressIndicator Programme with PID $pid; \"$availableProgrammes{$pid}{'name'}, $availableProgrammes{$pid}{'episode'}\" is in the ignore list, skipping...";
-    #     # Log file output
-    #     say $fhLogFile "$progressIndicator Programme with PID $pid; \"$availableProgrammes{$pid}{'name'}, $availableProgrammes{$pid}{'episode'}\" is in the ignore list, skipping...";
-    #     say $fhLogFile '';
-    # 
-    #     next;
-    # }
 
     # get programme info
     my $infoCommand = "$claExecutablePath --info --pid=$pid";
