@@ -451,13 +451,6 @@ foreach my $pid (keys %availableProgrammes) {
         $infoExitCode = $? >> 8;
         $infoAttempts++;
         $totalGetIplayerErrors++;
-        if($totalGetIplayerErrors > $maximumPermissableGetIplayerErrors) {
-            say $fhLogFile "$progressIndicator ERROR: Exiting due to more than $maximumPermissableGetIplayerErrors errors while attempting to run $claExecutablePath --info --pid=[PID] commands.";
-            say $fhLogFile '';
-            say "$progressIndicator ERROR: Exiting due to more than $maximumPermissableGetIplayerErrors errors while attempting to run $claExecutablePath --info --pid=[PID] commands.";
-            say "       See log for further details: $claLogFilePath";
-            last;
-        }
     }
     # say "get_iplayer --info exit code: $infoExitCode";
     # say "$infoOutput";
@@ -487,6 +480,17 @@ foreach my $pid (keys %availableProgrammes) {
         say $fhLogFile "$progressIndicator Failed $infoMaxAttempts times to get programme information for TV programme $pid; \"$availableProgrammes{$pid}{'name'}, $availableProgrammes{$pid}{'episode'}\"";
     }
     say $fhLogFile '';
+    if($totalGetIplayerErrors > $maximumPermissableGetIplayerErrors) {
+        say $fhLogFile "$progressIndicator ERROR: Exiting due to more than $maximumPermissableGetIplayerErrors errors while attempting to run $claExecutablePath --info --pid=[PID] commands.";
+        say $fhLogFile '';
+        say "$progressIndicator ERROR: Exiting due to more than $maximumPermissableGetIplayerErrors errors while attempting to run $claExecutablePath --info --pid=[PID] commands.";
+        say "       See log for further details: $claLogFilePath";
+        last;
+    }
+    # NB: BBC appear to be blocking get_iplayer --info... commands after 50 consecutive queries.
+    # TODO: Introduce a delay between each --info command OR Batch them into groups of <50, offer the user the choices and then do another <50?
+    # TODO: OR just wait for the error, end the --info fetching loop and let the user choose from what has been fetched?
+    # TODO: Try introducing a delay first...
 }
 
 # say $fhLogFile '';
