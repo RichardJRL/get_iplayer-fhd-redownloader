@@ -487,10 +487,11 @@ foreach my $pid (keys %availableProgrammes) {
         say "       See log for further details: $claLogFilePath";
         last;
     }
-    # NB: BBC appear to be blocking get_iplayer --info... commands after 50 consecutive queries.
+    # WARNING: THe BBC are blocking get_iplayer --info... commands after 50 consecutive queries.
     # TODO: Introduce a delay between each --info command OR Batch them into groups of <50, offer the user the choices and then do another <50?
     # TODO: OR just wait for the error, end the --info fetching loop and let the user choose from what has been fetched?
     # TODO: Try introducing a delay first...
+    sleep(15);
 }
 
 # say $fhLogFile '';
