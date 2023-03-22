@@ -490,8 +490,9 @@ foreach my $pid (keys %availableProgrammes) {
     # WARNING: THe BBC are blocking get_iplayer --info... commands after 50 consecutive queries.
     # TODO: Introduce a delay between each --info command OR Batch them into groups of <50, offer the user the choices and then do another <50?
     # TODO: OR just wait for the error, end the --info fetching loop and let the user choose from what has been fetched?
-    # TODO: Try introducing a delay first...
-    sleep(30);
+    # TODO: Try introducing a delay first... 
+    #15 and 30 second delays fail to circumvent the rate-limit. Now trying 72 seconds as I suspect it may 50 queries per hour as the limit?
+    sleep(72);
 }
 
 # say $fhLogFile '';
