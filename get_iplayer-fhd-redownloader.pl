@@ -491,7 +491,7 @@ foreach my $pid (keys %availableProgrammes) {
     # TODO: Introduce a delay between each --info command OR Batch them into groups of <50, offer the user the choices and then do another <50?
     # TODO: OR just wait for the error, end the --info fetching loop and let the user choose from what has been fetched?
     # TODO: Try introducing a delay first...
-    sleep(15);
+    sleep(30);
 }
 
 # say $fhLogFile '';
