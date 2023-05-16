@@ -62,7 +62,7 @@ The Perl script will then take the list of TV programme PIDs that have not been 
 
 After assembling a list of those TV programmes not already downloaded which are currently available on iPlayer, it will run the command `get_iplayer --info --pid=[PID]` to discover if they are now available in the new `fhd` 1080p resolution. This may take a *very, very* long time.
 
-The BBC appear to be rate-limiting `get_iplayer --info` queries as after 50 consecutive ones have been performed, further `--info` queries fail for an unknown period of time. Adding 15 and 30 second delays between `--info` queries fails to circumvent the rate-limit. The program is currently trying 72 seconds between queries as I suspect 50 queries per hour may be set as the limit. The program also caches the results of `--info` queries in the `~/.get_iplayer/fhd-redownloader/info.cache` file to avoid having to make subsequent queries of the same PID when the program is re-run. The `info.cache` file uses the same file format as `get_iplayer`'s `tv.cache` file as this format contains programme expiry information. Before any `get_iplayer --info` commands are run, the `info.cache` file is read and compared against the hash of available programmes, to reduce the number of `--info` queries that need to be made.
+The BBC appear to be rate-limiting `get_iplayer --info` queries as after 50 consecutive ones have been performed, further `--info` queries fail for an unknown period of time. Adding 15, 30 and even 72 second delays between `--info` queries fails to circumvent the rate-limit. Because of this, the program also caches the results of `--info` queries in the `~/.get_iplayer/fhd-redownloader/info.cache` file to avoid having to make subsequent queries of the same PID when the program is re-run. The `info.cache` file uses the same file format as `get_iplayer`'s `tv.cache` file as this format contains pertinent programme expiry information. Before any `get_iplayer --info` commands are run, the `info.cache` file is read and compared against the hash of available programmes, to reduce the number of `get_iplayer --info` queries that need to be made.
 
 **Aside:** Batching PIDs in the `get_iplayer --info --pid=[PID1],[PID2],[PID3]` command does not appear to speed up the process. In my testing, it merely makes the process of retrieving programme information more error prone.
 
@@ -82,6 +82,11 @@ Official file description copied from the first line of the `tv.cache` file.
 #index|type|name|episode|seriesnum|episodenum|pid|channel|available|expires|duration|desc|web|thumbnail|timeadded|
 ```
 **NB:** If the cache does not index the full last-30 days of programmes when first refreshed with `get_iplayer --refresh`, try forcing a cache rebuild with `get_iplayer --cache-rebuild`.
+### info.cache
+This is a variant of get_iplayer's `tv.cache` file created solely for this program and it adds three additional fields to the end of the line.
+```
+#index|type|name|episode|seriesnum|episodenum|pid|channel|available|expires|duration|desc|web|thumbnail|timeadded|version|qualities|fhd_download_size|
+```
 ### download_history
 Reconstructed from a programme's accompanying `.xml` metadata file.
 ```
