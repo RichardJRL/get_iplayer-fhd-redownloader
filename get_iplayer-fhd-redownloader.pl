@@ -20,13 +20,14 @@ use feature 'say';
 my $fhLogFile;
 
 # Variables to hold program data
-my %alreadyDownloadedHighDef;
-my %alreadyDownloadedStanDef;
-my %alreadyDownloadedBothDef;
-my %cachedProgrammes;
-my %availableProgrammes;
-my %availableInFhd;
-my %ignoreList;
+my %alreadyDownloadedHighDef;   # Programmes already downloaded in 1080p quality                        (download_history file format)
+my %alreadyDownloadedStanDef;   # Programmes already downloaded in 720p or lower quality                (download_history file format)
+my %alreadyDownloadedBothDef;   # Programmes already downloaded in both 1080p AND 720p or lower quality (download_history file format)
+my %cachedProgrammes;           # Programmes in the get_iplayer tv.cache file                                                                     (tv.cache file format)
+my %availableProgrammes;        # Programmes already downloaded only in 720p or lower quality that are available for download                     (tv.cache file format)
+my %availableInFhd;             # Programmes already downloaded only in 720p or lower quality that are available in 1080p quality for download    (tv.cache file format with added fields; 'version', 'qualities' and 'download_size'))
+my %infoCacheProgrammes;        # Programmes which have already had a get_iplayer --info query run against them                                   (tv.cache file format with added fields; 'version', 'qualities' and 'download_size')
+my %ignoreList;                 # Programmes which are not to be checked for 1080p quality versions ever again. (download_history file format)
 my $totalGetIplayerErrors = 0;
 my $maximumPermissableGetIplayerErrors = 50;
 my $cumulativeDownloadSize = 0;
@@ -41,6 +42,7 @@ my $claTVCacheFilePath = "$claDataDir" . 'tv.cache';
 my $claRedownloaderDir = "$claDataDir" . 'fhd-redownloader/';
 my $claLogFilePath = "$claRedownloaderDir" . 'activity.log';
 my $claIgnoreListFilePath = "$claRedownloaderDir" . 'ignore.list';
+my $claInfoCacheFilePath = "$claRedownloaderDir" . 'info.cache';
 
 # Variables to hold comand line arguments, and their defaults if not deliberately set
 # Testing overrides
@@ -51,6 +53,7 @@ my $claIgnoreListFilePath = "$claRedownloaderDir" . 'ignore.list';
 # my $claRedownloaderDir = $claDataDir . '/fhd-redownloader/';
 # my $claLogFilePath = $claRedownloaderDir . 'activity.log';
 # my $claIgnoreListFilePath = $claRedownloaderDir . 'ignore.list';
+# my $claIgnoreListFilePath = $claRedownloaderDir . 'info.cache';
 
 ################################################################################
 # Subroutines
@@ -85,6 +88,9 @@ sub addDownloadedProgrammeData {
 }
 
 # Subroutine to add downloaded programme data to the hash storing tv.cache data
+# Re-using the file format for the info.cache data with two additions to the hash; fhd and download_size
+# index|type|name|episode|seriesnum|episodenum|pid|channel|available|expires|duration|desc|web|thumbnail|timeadded|
+# Additions for info.cache --->>>                                                                                 |version|qualities|fhd_download_size|
 sub addCachedProgrammeData {
     my ($cachedProgrammeHashReference, $splitCachedProgammeReference, $fhLogFile) = @_;
 
@@ -104,11 +110,85 @@ sub addCachedProgrammeData {
         'desc'      => $splitCachedProgammeReference->[11],
         'web'       => $splitCachedProgammeReference->[12],
         'thumbnail' => $splitCachedProgammeReference->[13],
-        'timeadded' => $splitCachedProgammeReference->[14],
-        'download_size' => '0'
+        'timeadded' => $splitCachedProgammeReference->[14]
     );
+    # The following three fields only exist in fhd-redownloader's info.cache file, not get_iplayer's tv.cache file
+    if(scalar(@{$splitCachedProgammeReference}) == 18) {
+        # when parsing tv.cache
+        my %newProgrammeHash = (
+            'version'           => 'unknown',
+            'qualities'         => 'unknown',
+            'fhd_download_size' => 0
+        );
+    }
+    else {
+        # when parsing info.cache
+        my %newProgrammeHash = (
+            'version'             => $splitCachedProgammeReference->[15],
+            'qualities'           => $splitCachedProgammeReference->[16],
+            'fhd_download_size' => $splitCachedProgammeReference->[17]
+        );
+    }
 
     $cachedProgrammeHashReference->{$splitCachedProgammeReference->[6]} = \%newProgrammeHash;
+}
+
+# Subroutine to add a programme to the info.cache file
+sub addProgrammeToInfoCacheFile {
+    # Arguments: $filehandle, \%infoCacheProgrammes, $pid, 
+    my ($fhInfoCache, $infoCacheProgrammesReference, $pid) = @_;
+    
+    my $newInfoCacheLine = "$infoCacheProgrammesReference->{$pid}->{'index'}|$infoCacheProgrammesReference->{$pid}->{'type'}|";
+    $newInfoCacheLine .= "$infoCacheProgrammesReference->{$pid}->{'name'}|$infoCacheProgrammesReference->{$pid}->{'episode'}|";
+    $newInfoCacheLine .= "$infoCacheProgrammesReference->{$pid}->{'seriesnum'}|$infoCacheProgrammesReference->{$pid}->{'episodenum'}|";
+    $newInfoCacheLine .= "$pid|$infoCacheProgrammesReference->{$pid}->{'channel'}|$infoCacheProgrammesReference->{$pid}->{'available'}|";
+    $newInfoCacheLine .= "$infoCacheProgrammesReference->{$pid}->{'expires'}|$infoCacheProgrammesReference->{$pid}->{'duration'}|";
+    $newInfoCacheLine .= "$infoCacheProgrammesReference->{$pid}->{'desc'}|$infoCacheProgrammesReference->{$pid}->{'web'}|";
+    $newInfoCacheLine .= "$infoCacheProgrammesReference->{$pid}->{'thumbnail'}|$infoCacheProgrammesReference->{$pid}->{'timeadded'}|";
+    $newInfoCacheLine .= "$infoCacheProgrammesReference->{$pid}->{'version'}|$infoCacheProgrammesReference->{$pid}->{'qualities'}|";
+    $newInfoCacheLine .= "$infoCacheProgrammesReference->{$pid}->{'fhd_download_size'}|";
+
+    # Add the programme to the info.cache
+    say $fhInfoCache "$newInfoCacheLine";
+}
+
+# Subroutine to overwrite the info.cache file
+sub overwriteInfoCacheFile {
+    # Arguments: $filePath, \%infoCacheProgrammes, $logOutput
+    # $logOutput is a boolean value, 0 or 1 and controls whether the subroutine outputs to the terminal and log file
+    my ($filePath, $infoCacheProgrammesReference, $logOutput) = @_;
+    $logOutput //= 0;
+
+    open(my $fh, '>:encoding(UTF-8)', $filePath);
+
+    foreach my $pid (keys %$infoCacheProgrammesReference) {
+        addProgrammeToInfoCacheFile($fh, $infoCacheProgrammesReference, $pid);
+        
+        if($logOutput) {
+            # Terminal output
+            say "Added programme PID $pid \"$infoCacheProgrammesReference->{$pid}{'name'}, $infoCacheProgrammesReference->{$pid}{'episode'}\" to the info.cache file.";
+            # Log file output
+            say $fhLogFile "Added programme PID $pid \"$infoCacheProgrammesReference->{$pid}{'name'}, $infoCacheProgrammesReference->{$pid}{'episode'}\" to the info.cache file $filePath";
+        }
+    }
+    close $fh;
+}
+
+# Subroutine to append the info.cache file
+sub appendInfoCacheFile {
+    my ($filePath, $programmes_ref, $pid, $logOutput) = @_;
+    $logOutput //= 0;
+
+    open(my $fh, '>>:encoding(UTF-8)', $filePath);
+    addProgrammeToInfoCacheFile($fh, $programmes_ref, $pid);
+    close $fh;
+    
+    if($logOutput){
+        # Terminal output
+        say "Added programme PID $pid \"$programmes_ref->{$pid}{'name'}, $programmes_ref->{$pid}{'episode'}\" to the info.cache file.";
+        # Log file output
+        say $fhLogFile "Added programme PID $pid \"$programmes_ref->{$pid}{'name'}, $programmes_ref->{$pid}{'episode'}\" to the info.cache file $filePath";
+    }
 }
 
 # Subroutine to display a file size in a human-readable format
@@ -250,24 +330,15 @@ while(my $programmeInfo = <$fhDownloadHistory>) {
         next;
     }
 
-    # Check for 17 elements in the splitProgrammeInfo array
+    # Check for 18 elements in the splitProgrammeInfo array
     # Need '-1' to ensure empty fields in the file format are still translated into elements in the array
     my @splitProgrammeInfo = split(/\|/, $programmeInfo, -1);
     my $numElements = scalar(@splitProgrammeInfo) - 1;
-    if($numElements != 17) {
-        say $fhLogFile "download_history line $downloadHistorylineCounter: Number of elements in the line is not 17 ($numElements): $programmeInfo";
+    if($numElements != 18) {
+        say $fhLogFile "download_history line $downloadHistorylineCounter: Number of elements in the line is not 18 ($numElements): $programmeInfo";
         $downloadHistoryErrorCounter++;
         next;
     }
-
-    # Check for empty strings in the splitProgrammeInfo array and replace them with 'N/A'
-    # Commented for now as not really necessary
-    # for (my $i = 0; $i < @splitProgrammeInfo; $i++) {
-    #     if (length($splitProgrammeInfo[$i]) == 0) {
-    #         $splitProgrammeInfo[$i] = 'N/A';
-    #         say("Writing N/A to zero-length element number $i");
-    #     }
-    # }
 
     # Limit matches to TV programmes, exclude radio programmes
     if($programmeInfo =~ /^[a-zA-Z0-9]{8}\|.*\|.*\|tv\|/) {
@@ -317,14 +388,27 @@ say $fhLogFile "Number of programmes in the standard quality downloads array aft
 say $fhLogFile '';
 
 # Refresh get_iplayer's tv.cache file
-# TODO: Inspect exit code of refresh command, log, informational output to STDOUT too
 my $cacheRefreshCommand = "$claExecutablePath --refresh";
 say $fhLogFile "Refreshing get_iplayer's tv.cache file using the command $cacheRefreshCommand";
 say $fhLogFile '';
-`$cacheRefreshCommand`;
+$cacheRefreshOutput = `$cacheRefreshCommand`;
+$cacheRefreshExitCode = $? >> 8;
+if($cacheRefreshExitCode == 0) {
+    # Terminal output
+    say "Successfully refreshed get_iplayer's tv.cache file.";
+    # Log file output
+    say $fhLogFile "Successfully refreshed get_iplayer's tv.cache file.";
+}
+else {
+    # Terminal output
+    say "Error: Failed to refresh get_iplayer's tv.cache file, exit code $cacheRefreshExitCode.";
+    # Log file output
+    say $fhLogFile "Error: Failed to refresh get_iplayer's tv.cache file, exit code $cacheRefreshExitCode.";
+}
+
 # Parse get_iplayer's tv.cache file
 # tv.cache file format for reference
-#index|type|name|episode|seriesnum|episodenum|pid|channel|available|expires|duration|desc|web|thumbnail|timeadded|
+# index|type|name|episode|seriesnum|episodenum|pid|channel|available|expires|duration|desc|web|thumbnail|timeadded|
 my $fhTvCache;
 open($fhTvCache, '<:encoding(UTF-8)', $claTVCacheFilePath);
 say $fhLogFile "Errors encountered while parsing the get_iplayer tv.cache file $claTVCacheFilePath :";
@@ -421,78 +505,250 @@ say "Number of already downloaded TV programmes which are available now after ch
 say $fhLogFile "Number of already downloaded TV programmes which are available now after checking against the ignore list is " . scalar(%availableProgrammes);
 say $fhLogFile '';
 
+# Parse the info.cache file, if it exists.
+# It uses the same file format as the tv.cache file WITH ADDITIONS. tv.cache file format for reference:
+# index|type|name|episode|seriesnum|episodenum|pid|channel|available|expires|duration|desc|web|thumbnail|timeadded|
+# Additions for info.cache --->>>                                                                                 |version|qualities|fhd_download_size|
+if(-f $claInfoCacheFilePath) {
+    my $fhInfoCache;
+    open($fhInfoCache, '<:encoding(UTF-8)', $claInfoCacheFilePath);
+    say $fhLogFile "Errors encountered while parsing the info.cache file $claInfoCacheFilePath :";
+    my $numErrorsInInfoCacheFile = 0;
+    my $infoCacheLineCounter = 0;
+    while(my $infoProgramme = <$fhInfoCache>) {
+        my $infoCacheLineCounter++;
+        chomp $infoProgramme;
+        if($infoProgramme =~ /^[0-9]+\|/) {   
+            my @splitCachedProgamme = split(/\|/, $infoProgramme, -1);
+            my $numElements = scalar(@splitCachedProgamme) - 1;
+            if($numElements != 18) {
+                $numErrorsInInfoCacheFile++;
+                say $fhLogFile "Line $infoCacheLineCounter: Number of elements in the line is not 18 ($numElements): $infoProgramme";
+                next;
+            }
+            else {
+                # Reusing the download_history file format for the info.cache file
+                addCachedProgrammeData(\%infoCacheProgrammes, \@splitCachedProgamme, $fhLogFile);
+            }
+        }
+    }
+    if($numErrorsInInfoCacheFile == 0) {
+        say $fhLogFile "None";
+    }
+    close $fhInfoCache;
+
+    # Terminal output
+    say "Number of TV programmes in the info.cache file is " . scalar(%infoCacheProgrammes);
+    # Log file output
+    say $fhLogFile "Number of TV programmes in the info.cache file is " . scalar(%infoCacheProgrammes);
+    say $fhLogFile '';
+
+    # Parse %infoCacheProgrammes and remove expired programmes
+    # Directly comparing all infoCacheProgrammes expiry times with the time now is one way to do it.
+    # Another approach would be to see if the %infoCacheProgrammes PIDs are in the up-to-date cachedProgrammes hash: If not, they've obviously (probably?) expired, so delete them.
+    foreach my $pid (keys %infoCacheProgrammes) {
+        if($infoCacheProgrammes{$pid}{'expires'} < time()) {
+            # Log file output
+            say $fhLogFile "Programme PID $pid \"$infoCacheProgrammes{$pid}{'name'}, $infoCacheProgrammes{$pid}{'episode'}\" has expired, removing it from the info.cache file.";
+            delete($infoCacheProgrammes{$pid});
+        }
+    }
+
+    # Terminal output
+    say "Number of TV programmes in the info.cache file after removing expired programmes is " . scalar(%infoCacheProgrammes);
+    # Log file output
+    say $fhLogFile "Number of TV programmes in the info.cache file after removing expired programmes is " . scalar(%infoCacheProgrammes);
+    say $fhLogFile '';
+
+    # Overwrite info.cache file with updated list of programmes now that expired programmes have been removed from the infoCacheProgrammes hash.
+    overwriteInfoCacheFile($claInfoCacheFilePath, \%infoCacheProgrammes, 1);
+
+}
+else {
+    # NB: It is not necessarily an error if no info.cache file exists. This is purely informational.
+    # Terminal output
+    say "No info.cache file found";
+    # Log file output
+    say $fhLogFile "No info.cache file found";
+    say $fhLogFile '';
+}
+# There is now an updated info.cache file and an updated infoCacheProgrammes hash in the same state.
+
 # # use `get_iplayer --info --pid=[PID] to check which available programmes are available in fhd quality`
-say $fhLogFile "Checking which already downloaded programmes are available for download in 1080p quality now...";
+# Terminal output
 say "Checking which already downloaded programmes are available for download in 1080p quality now...";
 say "Please be patient, this may take a (very) long time...";
-# TODO: Implement Storable module to save progress with each iteration and reload on future runs?
+# Log file output
+say $fhLogFile "Checking which already downloaded programmes are available for download in 1080p quality now...";
 my $numAvailableProgrammes = scalar(%availableProgrammes);
 my $currentProgrammeNumber = 0;
 foreach my $pid (keys %availableProgrammes) {
     $currentProgrammeNumber++;
     my $progressIndicator = $currentProgrammeNumber . '/' . $numAvailableProgrammes . ':';
-
-    # get programme info
-    my $infoCommand = "$claExecutablePath --info --pid=$pid";
-    my $infoOutput = `$infoCommand`;
-    my $infoExitCode = 1;
-    my $infoAttempts = 0;
-    my $infoMaxAttempts = 4;
-    my $availableInFhd = 0;
-    my $downloadSize = 0;
-
-    # Terminal output
-    say "$progressIndicator Querying get_iplayer for information about available programme with PID $pid; \"$availableProgrammes{$pid}{'name'}, $availableProgrammes{$pid}{'episode'}\"...";
-    # Log file output
-    say $fhLogFile "$progressIndicator Querying get_iplayer for information about available programme with PID $pid; \"$availableProgrammes{$pid}{'name'}, $availableProgrammes{$pid}{'episode'}\"...";
+    
     # Get programme info, repeating a maximum of $infoMaxAttempts in case of failure
-    while($infoExitCode != 0 && $infoAttempts < $infoMaxAttempts) {
-        $infoOutput = `$infoCommand`;
-        $infoExitCode = $? >> 8;
-        $infoAttempts++;
-        $totalGetIplayerErrors++;
-    }
-    # say "get_iplayer --info exit code: $infoExitCode";
-    # say "$infoOutput";
+    if(exists $infoCacheProgrammes{$pid}) {
+        # Do NOT run a get_iplayer --info command, it is unnecessary as the programme information is already cached locally
+        # Check for fhd in the value of the 'qualities' key in the infoCacheProgrammes hash entry for the programme
+        
+        # Terminal output
+        say "$progressIndicator Cached programme information available for available programme with PID $pid; \"$availableProgrammes{$pid}{'name'}, $availableProgrammes{$pid}{'episode'}\"...";
+        # Log file output
+        say $fhLogFile "$progressIndicator Cached programme information available for available programme with PID $pid; \"$availableProgrammes{$pid}{'name'}, $availableProgrammes{$pid}{'episode'}\"...";
 
-    if($infoExitCode == 0) {
-        # search --info output for fhd entry on the `qualities:` line. There may be more than one `qualities:` line but one match is sufficient.
-        if($infoOutput =~ /qualities:.*:.*fhd/) {
-            $availableInFhd = 1;
-            $availableInFhd{$pid} = $availableProgrammes{$pid};
-            say $fhLogFile "$progressIndicator 1080p quality version available for programme with PID $pid; \"$availableProgrammes{$pid}{'name'}, $availableProgrammes{$pid}{'episode'}\".";
-
-            # search for `qualitysizes: ... fhd=`
-            if($infoOutput =~ /qualitysizes:.*:.*fhd=([0-9]+)MB/) {
-                $downloadSize = $1;
-                $availableInFhd{$pid}{'download_size'} = $downloadSize;
-            }
+        if($infoCacheProgrammes{$pid}{'qualities'} =~ /fhd/) {
+            # Add the programme to the availableInFhd hash
+            $availableInFhd{$pid} = $infoCacheProgrammes{$pid};
+            
+            # Terminal output
+            say "$progressIndicator 1080p quality version available for programme with PID $pid; \"$availableInFhd{$pid}{'name'}, $availableInFhd{$pid}{'episode'}\".";
+            # Log file output
+            say $fhLogFile "$progressIndicator 1080p quality version available for programme with PID $pid; \"$availableInFhd{$pid}{'name'}, $availableInFhd{$pid}{'episode'}\".";
         }
         else {
-            # say $fhLogFile ""; # Including notice of no higher quality version for all programmes might be too verbose?
+            # Terminal output
+            say "$progressIndicator Only standard quality version available for programme with PID $pid; \"$availableInFhd{$pid}{'name'}, $availableInFhd{$pid}{'episode'}\".";
+            # Log file output
+            say $fhLogFile "$progressIndicator Only standard quality version available for programme with PID $pid; \"$availableInFhd{$pid}{'name'}, $availableInFhd{$pid}{'episode'}\".";
         }
     }
     else {
-        # Report error, failed to get programme info in $infoMaxAttempts attempts
+        # Run a get_iplayer --info command
+
         # Terminal output
-        say "$progressIndicator Failed $infoMaxAttempts times to get programme information for TV programme $pid; \"$availableProgrammes{$pid}{'name'}, $availableProgrammes{$pid}{'episode'}\"";
+        say "$progressIndicator No cached programme information available. Querying get_iplayer for information about available programme with PID $pid; \"$availableProgrammes{$pid}{'name'}, $availableProgrammes{$pid}{'episode'}\"...";
         # Log file output
-        say $fhLogFile "$progressIndicator Failed $infoMaxAttempts times to get programme information for TV programme $pid; \"$availableProgrammes{$pid}{'name'}, $availableProgrammes{$pid}{'episode'}\"";
-    }
-    say $fhLogFile '';
-    if($totalGetIplayerErrors > $maximumPermissableGetIplayerErrors) {
-        say $fhLogFile "$progressIndicator ERROR: Exiting due to more than $maximumPermissableGetIplayerErrors errors while attempting to run $claExecutablePath --info --pid=[PID] commands.";
+        say $fhLogFile "$progressIndicator No cached programme information available. Querying get_iplayer for information about available programme with PID $pid; \"$availableProgrammes{$pid}{'name'}, $availableProgrammes{$pid}{'episode'}\"...";
+
+        # get programme info
+        my $infoCommand = "$claExecutablePath --info --pid=$pid";
+        my $infoOutput = `$infoCommand`;
+        my $infoExitCode = 1;
+        my $infoAttempts = 0;
+        my $infoMaxAttempts = 4;
+        my $downloadSize = 0;
+
+        while($infoExitCode != 0 && $infoAttempts < $infoMaxAttempts) {
+            $infoOutput = `$infoCommand`;
+            $infoExitCode = $? >> 8;
+            $infoAttempts++;
+            $totalGetIplayerErrors++;
+        }
+        # TODO: Remove this after testing. Debugging output only. 
+        # say "get_iplayer --info exit code: $infoExitCode";
+        # say "$infoOutput";
+
+        if($infoExitCode == 0) {
+            # Reference lines from --info output:
+            # qualities:       audiodescribed: sd,web,mobile
+            # qualities:       original: fhd,hd,sd,web,mobile
+            # qualitysizes:    audiodescribed: sd=378MB,web=378MB,mobile=119MB [estimated sizes]
+            # qualitysizes:    original: fhd=1819MB,hd=1157MB,sd=655MB,web=378MB,mobile=119MB [estimated sizes]
+
+            # Add the programme to the infoCacheProgrammes hash regardless of whether an fhd quality version is available, but handle fhd and non-fhd differently
+            # fhd version available first
+            # A regex to match zero or more whitespace characters
+            if($infoOutput =~ /^qualities:\s*((?:(?!signed|audiodescribed)\S)+): (.*fhd.*)$/) {
+                $infoCacheProgrammes{$pid} = $availableProgrammes{$pid};
+                # Now need to provide values for the aditional keys, version, qualities and qualitysizes that infoCacheProgrammes has
+                # Include all available qualities, it needs to go in the infoCacheProgrammes array regardless of what's available to stop unnecessary future --info queries
+                my $programmeVersion = $1;
+                $infoCacheProgrammes{$pid}{'version'} = $programmeVersion;
+                $infoCacheProgrammes{$pid}{'qualities'} = $2;
+                # TODO: Remove this after testing. Debugging output only. 
+                say "infoCacheProgrammes{$pid}{'version'} is $infoCacheProgrammes{$pid}{'version'}";
+                say "infoCacheProgrammes{$pid}{'qualities'} is $infoCacheProgrammes{$pid}{'qualities'}";
+                if($infoOutput =~ /^qualitysizes:\s*$programmeVersion:.*fhd=([0-9]+)MB/) {
+                    $infoCacheProgrammes{$pid}{'fhd_download_size'} = $1;
+                    # TODO: Remove this after testing. Debugging output only. 
+                    say "infoCacheProgrammes{$pid}{'fhd_download_size'} is $infoCacheProgrammes{$pid}{'fhd_download_size'}";
+                }
+                else {
+                    # This is an anomaly... if fhd was listed in 'qualities' there should be a corresponding fhd entry in 'qualitysizes'.
+                    # Terminal output
+                    say "$progressIndicator No fhd_download_size value available for fhd programme with PID $pid; \"$availableProgrammes{$pid}{'name'}, $availableProgrammes{$pid}{'episode'}\".";
+                    # Log file output
+                    say $fhLogFile "$progressIndicator No fhd_download_size value available for fhd programme with PID $pid; \"$availableProgrammes{$pid}{'name'}, $availableProgrammes{$pid}{'episode'}\".";
+                    # Store a value of -1 in the case of no fhd version being available
+                    $infoCacheProgrammes{$pid}{'fhd_download_size'} = -2;
+                }
+                # Add the programme to the availableInFhd hash
+                $availableInFhd{$pid} = $infoCacheProgrammes{$pid};
+            }
+            # Only a non-fhd version available
+            else {
+                if($infoOutput =~ /^qualities:\s*((?:(?!signed|audiodescribed)\S)+): (.*)$/) {
+                    $infoCacheProgrammes{$pid} = $availableProgrammes{$pid};
+                    # Now need to provide values for the aditional keys, version, qualities and qualitysizes that infoCacheProgrammes has
+                    # Include all available qualities, it needs to go in the infoCacheProgrammes array regardless of what's available to stop unnecessary future --info queries
+                    my $programmeVersion = $1;
+                    $infoCacheProgrammes{$pid}{'version'} = $programmeVersion;
+                    $infoCacheProgrammes{$pid}{'qualities'} = $2;
+                    $infoCacheProgrammes{$pid}{'fhd_download_size'} = -1;
+                    # TODO: Remove this after testing. Debugging output only. 
+                    say "infoCacheProgrammes{$pid}{'version'} is $infoCacheProgrammes{$pid}{'version'}";
+                    say "infoCacheProgrammes{$pid}{'qualities'} is $infoCacheProgrammes{$pid}{'qualities'}";
+                    say "infoCacheProgrammes{$pid}{'fhd_download_size'} is $infoCacheProgrammes{$pid}{'fhd_download_size'}";
+
+                    # Terminal output
+                    say "$progressIndicator Only a non-1080p quality version is available for programme with PID $pid; \"$availableProgrammes{$pid}{'name'}, $availableProgrammes{$pid}{'episode'}\".";
+                    # Log file output
+                    say $fhLogFile "$progressIndicator Only a non-1080p quality version is available for programme with PID $pid; \"$availableProgrammes{$pid}{'name'}, $availableProgrammes{$pid}{'episode'}\".";
+                }
+                else {
+                    # Match either 'audiodescribed' or 'signed' in the 'qualities' line and save it in a capturing group
+                    if($infoOutput =~ /^qualities:\s*((?:audiodescribed|signed)): (.*)$/) {
+                        $infoCacheProgrammes{$pid} = $availableProgrammes{$pid};
+                        # Now need to provide values for the aditional keys, version, qualities and qualitysizes that infoCacheProgrammes has
+                        # Include all available qualities, it needs to go in the infoCacheProgrammes array regardless of what's available to stop unnecessary future --info queries
+                        my $programmeVersion = $1;
+                        $infoCacheProgrammes{$pid}{'version'} = $programmeVersion;
+                        $infoCacheProgrammes{$pid}{'qualities'} = $2;
+                        $infoCacheProgrammes{$pid}{'fhd_download_size'} = -1;
+                        # TODO: Remove this after testing. Debugging output only. 
+                        say "infoCacheProgrammes{$pid}{'version'} is $infoCacheProgrammes{$pid}{'version'}";
+                        say "infoCacheProgrammes{$pid}{'qualities'} is $infoCacheProgrammes{$pid}{'qualities'}";
+                        say "infoCacheProgrammes{$pid}{'fhd_download_size'} is $infoCacheProgrammes{$pid}{'fhd_download_size'}";
+
+                        # Terminal output
+                        say "$progressIndicator Only a non-1080p $infoCacheProgrammes{$pid}{'version'} version is available for programme with PID $pid; \"$availableProgrammes{$pid}{'name'}, $availableProgrammes{$pid}{'episode'}\".";
+                        # Log file output
+                        say $fhLogFile "$progressIndicator Only a non-1080p $infoCacheProgrammes{$pid}{'version'} version is available for programme with PID $pid; \"$availableProgrammes{$pid}{'name'}, $availableProgrammes{$pid}{'episode'}\".";
+                    }
+                }
+            }
+
+            # Append the updated infoCacheProgrammes hash to the info.cache file
+            appendInfoCacheFile($claInfoCacheFilePath, \%infoCacheProgrammes, $pid, 1);
+
+            say $fhLogFile '';
+        }
+        else {
+            # Report error, failed to get programme info in $infoMaxAttempts attempts
+            # Terminal output
+            say "$progressIndicator Failed $infoMaxAttempts times to get programme information for TV programme $pid; \"$availableProgrammes{$pid}{'name'}, $availableProgrammes{$pid}{'episode'}\"";
+            # Log file output
+            say $fhLogFile "$progressIndicator Failed $infoMaxAttempts times to get programme information for TV programme $pid; \"$availableProgrammes{$pid}{'name'}, $availableProgrammes{$pid}{'episode'}\"";
+        }
         say $fhLogFile '';
-        say "$progressIndicator ERROR: Exiting due to more than $maximumPermissableGetIplayerErrors errors while attempting to run $claExecutablePath --info --pid=[PID] commands.";
-        say "       See log for further details: $claLogFilePath";
-        last;
-    }
-    # WARNING: THe BBC are blocking get_iplayer --info... commands after 50 consecutive queries.
-    # TODO: Introduce a delay between each --info command OR Batch them into groups of <50, offer the user the choices and then do another <50?
-    # TODO: OR just wait for the error, end the --info fetching loop and let the user choose from what has been fetched?
-    # TODO: Try introducing a delay first... 
-    #15 and 30 second delays fail to circumvent the rate-limit. Now trying 72 seconds as I suspect it may 50 queries per hour as the limit?
-    sleep(72);
+
+        # Exit if the total number of errors indicates a serious problem with get_iplayer
+        if($totalGetIplayerErrors > $maximumPermissableGetIplayerErrors) {
+            say $fhLogFile "$progressIndicator ERROR: Exiting due to more than $maximumPermissableGetIplayerErrors errors while attempting to run $claExecutablePath --info --pid=[PID] commands.";
+            say $fhLogFile '';
+            say "$progressIndicator ERROR: Exiting due to more than $maximumPermissableGetIplayerErrors errors while attempting to run $claExecutablePath --info --pid=[PID] commands.";
+            say "       See log for further details: $claLogFilePath";
+            last;
+        }
+
+        # WARNING: The BBC are blocking get_iplayer --info... commands after 50 consecutive queries.
+        # TODO: Introduce a delay between each --info command OR Batch them into groups of <50, offer the user the choices and then do another <50?
+        # TODO: OR just wait for the error, end the --info fetching loop and let the user choose from what has been fetched?
+        # TODO: Try introducing a delay first... 
+        # 15, 30 and 72 (50 queries/hour) second delays fail to circumvent the rate-limit.
+        # 90 seconds to try next, but commented out for now as the info.cache code needs to be tested quicker.
+        # sleep(90);
+    }    
 }
 
 # say $fhLogFile '';
@@ -520,7 +776,7 @@ foreach my $fhdPid (@sortedAvailableInFhdArray) {
     # Current time (epoch seconds)
     my $currentTime = time();
     # Expiry time (epoch seconds)
-    my $expiryTime = $availableInFhd{$fhdPid}{expires};
+    my $expiryTime = $availableInFhd{$fhdPid}{'expires'};
     # Time difference in seconds
     my $differenceTime = $expiryTime - $currentTime;
 
@@ -535,8 +791,15 @@ foreach my $fhdPid (@sortedAvailableInFhdArray) {
     say '';
     say "Programme PID $fhdPid \"$availableInFhd{$fhdPid}{'name'}, $availableInFhd{$fhdPid}{'episode'}\" is available in 1080p quality.";
     say "The total download size of programmes already added to get_iplayer's pvr-queue in this session is estimated to be " . prettyFileSize($cumulativeDownloadSize) . '.';
-    say "The download size of this programme is estimated to be " . prettyFileSize($availableInFhd{$fhdPid}{'download_size'}) . '.';
+    say "The download size of this programme is estimated to be " . prettyFileSize($availableInFhd{$fhdPid}{'fhd_download_size'}) . '.';
     say "The programme expires from iPlayer in $expiryDays days, $expiryRemainderHours hours and $expiryRemainderMinutes minutes at " . localtime($expiryTime);
+    # Warning if the programme version is not 'original'
+    if($availableInFhd{$fhdPid}{'version'} ne 'original') {
+        say "WARNING: The programme version available now is not 'original', it is '$availableInFhd{$fhdPid}{'version'}'.";
+        say "       : Do you still want to download it?";
+        say "       : It may be worth comparing the runtime of this version to your existing download of this programme before overwriting it.";
+        say "       : Especially if this version is 'editorial', where both runtime and content may vary considerably from what you already have.";
+    }
     say "Would you like to add it to the download queue?";
     say "[y]es    - add it to the download queue.";
     say "[n]o     - do not download it this time (DEFAULT).";
@@ -574,13 +837,18 @@ foreach my $fhdPid (@sortedAvailableInFhdArray) {
         my $pvrQueueCommandOutput= `$pvrQueueCommand`;
         my $pvrQueueCommandExitCode = $? >> 8;
         if ($pvrQueueCommandExitCode == 0) {
-            $cumulativeDownloadSize += $availableInFhd{$fhdPid}{'download_size'};
+            $cumulativeDownloadSize += $availableInFhd{$fhdPid}{'fhd_download_size'};
             $numProgrammesAddedToPvr++;
             # Terminal output
             say "Added programme PID $fhdPid \"$availableInFhd{$fhdPid}{'name'}, $availableInFhd{$fhdPid}{'episode'}\" to get_iplayer's PVR queue.";
             # Log file output
             say $fhLogFile "Added programme PID $fhdPid \"$availableInFhd{$fhdPid}{'name'}, $availableInFhd{$fhdPid}{'episode'}\" to get_iplayer's PVR queue.";
             say $fhLogFile "Command used: $pvrQueueCommand";
+
+            # Remove the programme's information from the info.cache file
+            delete($infoCacheProgrammes{$fhdPid});
+            overwriteInfoCacheFile($claInfoCacheFilePath, \%infoCacheProgrammes);
+
         }
         else {
             # Error adding to get_iplayer's pvr
@@ -622,6 +890,10 @@ foreach my $fhdPid (@sortedAvailableInFhdArray) {
         say "Added programme PID $fhdPid \"$availableInFhd{$fhdPid}{'name'}, $availableInFhd{$fhdPid}{'episode'}\" to the ignore list.";
         # Log file output
         say $fhLogFile "Added programme PID $fhdPid \"$availableInFhd{$fhdPid}{'name'}, $availableInFhd{$fhdPid}{'episode'}\" to the ignore list file $claIgnoreListFilePath";
+
+        # Remove the programme's information from the info.cache file
+        delete($infoCacheProgrammes{$fhdPid});
+        overwriteInfoCacheFile($claInfoCacheFilePath, \%infoCacheProgrammes);
     }
 
     # Quit: Cleanly exit the program without processing any more programmes.
@@ -630,6 +902,7 @@ foreach my $fhdPid (@sortedAvailableInFhdArray) {
         say "Not processing any more programmes...";
         # Log file output
         say $fhLogFile "User requested to quit before processing all available programmes...";
+
         last;
     }
     say '';
@@ -639,11 +912,12 @@ foreach my $fhdPid (@sortedAvailableInFhdArray) {
 close $fhAppendIgnoreList;
 say $fhLogFile '';
 
-# Offer to run get_iplayer --pvr now (TODO: check command is correct!)?
+# Offer to run get_iplayer --pvr now
 if ($numProgrammesAddedToPvr > 0) {
     my $pvrRunCommand = "$claExecutablePath --pvr";
     my $userInput;
-    say "$numProgrammesAddedToPvr programmes have been added to get_iplayer's PVR. Would you like to launch the PVR automatically as this script exits ([y]es/[n]o)?";
+    say "$numProgrammesAddedToPvr programmes have been added to get_iplayer's PVR.";
+    say "Would you like to launch the PVR automatically as this script exits ([y]es/[n]o)?";
     while(1) {
         $userInput = readline(STDIN);
         chomp $userInput;
@@ -667,5 +941,3 @@ if ($numProgrammesAddedToPvr > 0) {
         close $fhLogFile;
     }
 }
-
-# TODO: Sort the availableProgrammes and/or availableInFhd array by the expires field

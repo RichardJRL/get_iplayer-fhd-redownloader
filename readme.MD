@@ -20,9 +20,10 @@ It requires read-only access to two `get_iplayer` created files:
 - `~/.get_iplayer/download_history`
 - `~/.get_iplayer/tv.cache`
   
-It writes to two new files in a new subdirectory of the user's hidden `~/.get_iplayer` directory:
+It writes to three new files in a new subdirectory of the user's hidden `~/.get_iplayer` directory:
 - `~/.get_iplayer/fhd-redownloader/ignore.list`
 - `~/.get_iplayer/fhd-redownloader/activity.log`
+- `~/.get_iplayer/fhd-redownloader/info.cache`
 
 ```
 # The get_iplayer executable:
@@ -35,6 +36,7 @@ It writes to two new files in a new subdirectory of the user's hidden `~/.get_ip
 # fhd-redownloader files:
 --log-file [/path/to/fhd-redownloader's_log_file]
 --ignore-list [/path/to/fhd-redownloader's_ignore_list]
+--info-cache [/path/to/fhd-redownloader's_info_cache]
 ```
 ### Usage Examples
 ```
@@ -59,6 +61,8 @@ This is a Perl script to parse a `~/.get_iplayer/download_history` file and extr
 The Perl script will then take the list of TV programme PIDs that have not been downloaded in 1080p and search the `~/.get_iplayer/tv.cache` file to see if any of them are currently available on iPlayer.
 
 After assembling a list of those TV programmes not already downloaded which are currently available on iPlayer, it will run the command `get_iplayer --info --pid=[PID]` to discover if they are now available in the new `fhd` 1080p resolution. This may take a *very, very* long time.
+
+The BBC appear to be rate-limiting `get_iplayer --info` queries as after 50 consecutive ones have been performed, further `--info` queries fail for an unknown period of time. Adding 15 and 30 second delays between `--info` queries fails to circumvent the rate-limit. The program is currently trying 72 seconds between queries as I suspect 50 queries per hour may be set as the limit. The program also caches the results of `--info` queries in the `~/.get_iplayer/fhd-redownloader/info.cache` file to avoid having to make subsequent queries of the same PID when the program is re-run. The `info.cache` file uses the same file format as `get_iplayer`'s `tv.cache` file as this format contains programme expiry information. Before any `get_iplayer --info` commands are run, the `info.cache` file is read and compared against the hash of available programmes, to reduce the number of `--info` queries that need to be made.
 
 **Aside:** Batching PIDs in the `get_iplayer --info --pid=[PID1],[PID2],[PID3]` command does not appear to speed up the process. In my testing, it merely makes the process of retrieving programme information more error prone.
 
@@ -109,6 +113,34 @@ These are the only problematic TV programme PIDs discovered in an 11000 line `do
 - Ignore zero-length lines
 - Only parse 17 element lines
 - Write non-conforming lines to a log file and forget about them in the program flow thereafter. Users will have to sort these out manually.
+
+## iPlayer Versions
+If the `.xml` files that accompany BBC programmes are downloaded with `get_iplayer`, the following command can be used on the download directory to find all iPlayer `version`s that have been obtained. 
+```
+find ./ -name *.xml -type f -execdir grep '<version>' {} \; | sed -E 's/.*<version>(.*)<\/version>/\1/g' | sort | uniq
+```
+Running the command against my library yielded the following:
+### Versions known to not be available in full HD quality
+- audiodescribed
+- signed
+
+### Versions that may be available in full HD quality
+- default
+- editorial
+- editorial2
+- editorial3
+- iplayer
+- legal
+- lengthened
+- opensubtitles
+- original
+- original3
+- other
+- postwatershed
+- prewatershed
+- shortened
+- technical
+  
 ## Links
 - get_iplayer [GitHub](https://github.com/get-iplayer/get_iplayer)
 - get_iplayer [Wiki](https://github.com/get-iplayer/get_iplayer/wiki)
