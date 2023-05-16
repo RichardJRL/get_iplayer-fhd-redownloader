@@ -454,8 +454,6 @@ foreach my $cachedPid (keys %cachedProgrammes) {
     }
 }
 
-# TODO: Delete Dumper line, debugging only
-# say $fhLogFile Dumper(%availableProgrammes);
 # Terminal output
 say "Number of already downloaded TV programmes which are available now is " . scalar(%availableProgrammes);
 # Log file output
@@ -647,7 +645,7 @@ foreach my $pid (keys %availableProgrammes) {
             $infoAttempts++;
             $totalGetIplayerErrors++;
         }
-        # TODO: Remove this after testing. Debugging output only. 
+        # TODO: Remove after testing. Debugging output only. 
         # say "DEBUG: get_iplayer --info exit code: $infoExitCode";
         # say "$infoOutput";
 
@@ -673,12 +671,12 @@ foreach my $pid (keys %availableProgrammes) {
                 my $programmeVersion = $1;
                 $infoCacheProgrammes{$pid}{'version'} = $programmeVersion;
                 $infoCacheProgrammes{$pid}{'qualities'} = $2;
-                # TODO: Remove this after testing. Debugging output only. 
+                # TODO: Remove after testing. Debugging output only. 
                 # say "DEBUG: infoCacheProgrammes{$pid}{'version'} is $infoCacheProgrammes{$pid}{'version'}";
                 # say "DEBUG: infoCacheProgrammes{$pid}{'qualities'} is $infoCacheProgrammes{$pid}{'qualities'}";
                 if($infoOutput =~ /^qualitysizes:\s*$programmeVersion:.*fhd=([0-9]+)MB/m) {
                     $infoCacheProgrammes{$pid}{'fhd_download_size'} = $1;
-                    # TODO: Remove this after testing. Debugging output only. 
+                    # TODO: Remove after testing. Debugging output only. 
                     # say "DEBUG: infoCacheProgrammes{$pid}{'fhd_download_size'} is $infoCacheProgrammes{$pid}{'fhd_download_size'}";
                 }
                 else {
@@ -694,7 +692,7 @@ foreach my $pid (keys %availableProgrammes) {
                 $availableInFhd{$pid} = $infoCacheProgrammes{$pid};
 
                 # Append the updated infoCacheProgrammes hash to the info.cache file
-                # TODO: Delete after debugging: Use data dumper to print the infoCacheProgrammes hash of the current pid to the terminal
+                # TODO: Remove after testing. Debugging output only.
                 # say Dumper($infoCacheProgrammes{$pid}); 
                 appendInfoCacheFile($claInfoCacheFilePath, \%infoCacheProgrammes, $pid, 1);
             }
@@ -713,7 +711,7 @@ foreach my $pid (keys %availableProgrammes) {
                     $infoCacheProgrammes{$pid}{'version'} = $programmeVersion;
                     $infoCacheProgrammes{$pid}{'qualities'} = $2;
                     $infoCacheProgrammes{$pid}{'fhd_download_size'} = -1;
-                    # TODO: Remove this after testing. Debugging output only.
+                    # TODO: Remove after testing. Debugging output only.
                     # say "DEBUG: infoCacheProgrammes{$pid}{'version'} is $infoCacheProgrammes{$pid}{'version'}";
                     # say "DEBUG: infoCacheProgrammes{$pid}{'qualities'} is $infoCacheProgrammes{$pid}{'qualities'}";
                     # say "DEBUG: infoCacheProgrammes{$pid}{'fhd_download_size'} is $infoCacheProgrammes{$pid}{'fhd_download_size'}";
@@ -738,7 +736,7 @@ foreach my $pid (keys %availableProgrammes) {
                         $infoCacheProgrammes{$pid}{'version'} = $programmeVersion;
                         $infoCacheProgrammes{$pid}{'qualities'} = $2;
                         $infoCacheProgrammes{$pid}{'fhd_download_size'} = -1;
-                        # TODO: Remove this after testing. Debugging output only. 
+                        # TODO: Remove after testing. Debugging output only.
                         # say "DEBUG: infoCacheProgrammes{$pid}{'version'} is $infoCacheProgrammes{$pid}{'version'}";
                         # say "DEBUG: infoCacheProgrammes{$pid}{'qualities'} is $infoCacheProgrammes{$pid}{'qualities'}";
                         # say "DEBUG: infoCacheProgrammes{$pid}{'fhd_download_size'} is $infoCacheProgrammes{$pid}{'fhd_download_size'}";
@@ -749,7 +747,7 @@ foreach my $pid (keys %availableProgrammes) {
                         say $fhLogFile "$progressIndicator Only a non-1080p $infoCacheProgrammes{$pid}{'version'} version is available for programme with PID $pid; \"$availableProgrammes{$pid}{'name'}, $availableProgrammes{$pid}{'episode'}\".";
 
                         # Append the updated infoCacheProgrammes hash to the info.cache file
-                        # TODO: Delete after debugging: Use data dumper to print the infoCacheProgrammes hash of the current pid to the terminal
+                        # TODO: Remove after testing. Debugging output only.
                         # say Dumper($infoCacheProgrammes{$pid});
                         appendInfoCacheFile($claInfoCacheFilePath, \%infoCacheProgrammes, $pid, 1);
                     }
