@@ -612,15 +612,19 @@ foreach my $pid (keys %availableProgrammes) {
             $availableInFhd{$pid} = $infoCacheProgrammes{$pid};
             
             # Terminal output
-            say "$progressIndicator 1080p quality version available for programme with PID $pid; \"$infoCacheProgrammes{$pid}{'name'}, $infoCacheProgrammes{$pid}{'episode'}\".";
+            say "$progressIndicator 1080p quality version available for programme with PID $pid; \"$availableProgrammes{$pid}{'name'}, $availableProgrammes{$pid}{'episode'}\".";
             # Log file output
-            say $fhLogFile "$progressIndicator 1080p quality version available for programme with PID $pid; \"$infoCacheProgrammes{$pid}{'name'}, $infoCacheProgrammes{$pid}{'episode'}\".";
+            say $fhLogFile "$progressIndicator 1080p quality version available for programme with PID $pid; \"$availableProgrammes{$pid}{'name'}, $availableProgrammes{$pid}{'episode'}\".";
         }
         else {
+            # Do not add the programme to the availableInFhd hash, only issue a warning.
             # Terminal output
-            say "$progressIndicator Only standard quality version available for programme with PID $pid; \"$infoCacheProgrammes{$pid}{'name'}, $infoCacheProgrammes{$pid}{'episode'}\".";
+            say "$progressIndicator Only standard quality version available for programme with PID $pid; \"$availableProgrammes{$pid}{'name'}, $availableProgrammes{$pid}{'episode'}\".";
             # Log file output
-            say $fhLogFile "$progressIndicator Only standard quality version available for programme with PID $pid; \"$infoCacheProgrammes{$pid}{'name'}, $infoCacheProgrammes{$pid}{'episode'}\".";
+            say $fhLogFile "$progressIndicator Only standard quality version available for programme with PID $pid; \"$availableProgrammes{$pid}{'name'}, $availableProgrammes{$pid}{'episode'}\".";
+
+            # Force a jump to the next iteration of the foreach loop, should not be necessary, but added for certainty to aid debugging.
+            next;
         }
     }
     else {
