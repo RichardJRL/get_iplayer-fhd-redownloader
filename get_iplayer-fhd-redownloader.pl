@@ -612,15 +612,15 @@ foreach my $pid (keys %availableProgrammes) {
             $availableInFhd{$pid} = $infoCacheProgrammes{$pid};
             
             # Terminal output
-            say "$progressIndicator 1080p quality version available for programme with PID $pid; \"$availableInFhd{$pid}{'name'}, $availableInFhd{$pid}{'episode'}\".";
+            say "$progressIndicator 1080p quality version available for programme with PID $pid; \"$infoCacheProgrammes{$pid}{'name'}, $infoCacheProgrammes{$pid}{'episode'}\".";
             # Log file output
-            say $fhLogFile "$progressIndicator 1080p quality version available for programme with PID $pid; \"$availableInFhd{$pid}{'name'}, $availableInFhd{$pid}{'episode'}\".";
+            say $fhLogFile "$progressIndicator 1080p quality version available for programme with PID $pid; \"$infoCacheProgrammes{$pid}{'name'}, $infoCacheProgrammes{$pid}{'episode'}\".";
         }
         else {
             # Terminal output
-            say "$progressIndicator Only standard quality version available for programme with PID $pid; \"$availableInFhd{$pid}{'name'}, $availableInFhd{$pid}{'episode'}\".";
+            say "$progressIndicator Only standard quality version available for programme with PID $pid; \"$infoCacheProgrammes{$pid}{'name'}, $infoCacheProgrammes{$pid}{'episode'}\".";
             # Log file output
-            say $fhLogFile "$progressIndicator Only standard quality version available for programme with PID $pid; \"$availableInFhd{$pid}{'name'}, $availableInFhd{$pid}{'episode'}\".";
+            say $fhLogFile "$progressIndicator Only standard quality version available for programme with PID $pid; \"$infoCacheProgrammes{$pid}{'name'}, $infoCacheProgrammes{$pid}{'episode'}\".";
         }
     }
     else {
