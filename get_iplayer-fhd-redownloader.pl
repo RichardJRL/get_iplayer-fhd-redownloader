@@ -400,7 +400,10 @@ say $fhLogFile '';
 
 # Refresh get_iplayer's tv.cache file
 my $cacheRefreshCommand = "$claExecutablePath --refresh";
-say $fhLogFile "Refreshing get_iplayer's tv.cache file using the command $cacheRefreshCommand";
+# Terminal output
+say "Refreshing get_iplayer's tv.cache file using the command $cacheRefreshCommand. Please be patient...";
+# Log file output
+say $fhLogFile "Refreshing get_iplayer's tv.cache file using the command $cacheRefreshCommand. Please be patient";
 say $fhLogFile '';
 my $cacheRefreshOutput = `$cacheRefreshCommand`;
 my $cacheRefreshExitCode = $? >> 8;
@@ -591,6 +594,7 @@ say "Checking which already downloaded programmes are available for download in 
 say "Please be patient, this may take a (very) long time...";
 # Log file output
 say $fhLogFile "Checking which already downloaded programmes are available for download in 1080p quality now...";
+say "Please be patient, this may take a (very) long time...";
 my $numAvailableProgrammes = scalar(%availableProgrammes);
 my $currentProgrammeNumber = 0;
 foreach my $pid (keys %availableProgrammes) {
