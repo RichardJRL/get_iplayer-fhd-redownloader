@@ -839,7 +839,7 @@ foreach my $fhdPid (@sortedAvailableInFhdArray) {
         say "WARNING: The programme version available now is not 'original', it is '$availableInFhd{$fhdPid}{'version'}'.";
         say "       : Do you still want to download it?";
         say "       : It may be worth comparing the runtime of this version to your existing download of this programme before overwriting it.";
-        say "       : Especially if this version is 'editorial', where both runtime and content may vary considerably from what you already have.";
+        say "       : Especially if this version is 'editorial' or 'shortened', where both runtime and content may vary considerably from what you already have.";
     }
     say "Would you like to add it to the download queue?";
     say "[y]es    - add it to the download queue.";
